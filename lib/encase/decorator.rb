@@ -4,13 +4,26 @@ module Encase
   # their behavior.
   class Decorator
 
+    # Generate a module containing a method for applying the decorator.  This
+    # may be named explicitly, but defaults to the same name as the class.
+    # @param name [#to_s] the name of the decorator method
+    # @return [Module] a module containing the decorator (and setup code)
+    def self.module(name=self.name)
+      raise "Can't automatically detect name of anonymous classes" if name.nil?
+      name = "#{name}"[/[^:]*$/]
+      @modules[self][name]
+    end
+
     # Wraps the given callable object in a Proc that passes it through to the
     # {#around} method (which itself delegates to {#before} and {#after}).
     # @param code [#call] the callable to augment
     # @return [Proc] a decorated callable
     def wrap_callable(code)
       decorator = self
-      proc { |*args, &block| decorator.send(:around, code, args, block) }
+      proc do |*args, &block|
+        code = code.bind(self) if code.respond_to? :bind
+        decorator.send(:around, code, args, block)
+      end
     end
 
     private
@@ -40,5 +53,66 @@ module Encase
     # @param block [Proc] the block the wrapper was invoked with
     # @param retval [Any] the result of having called +code+
     def after(code, args, block, retval); end
+
+    # Propagate the +@modules+ variable to Decorator subclasses.
+    # @param klass [Class] the subclass of {Decorator}
+    def self.inherited(klass)
+      klass.instance_variable_set(:@modules, @modules)
+    end
+
+    # The @modules variable is a cache of the Decorator modules we've created
+    # thus far.  Each Decorator subclass gets a reference to this variable.
+    # The Module itself is cached by subclass, then by name.
+    @modules = Hash.new do |hash, decorator|
+      hash[decorator] = Hash.new do |hash, name|
+        hash[name] = Module.new do
+
+          # We're interested in seeing decorators at the class level, so we
+          # extend the class with the methods from this module.
+          def self.included(base)
+            base.extend(self)
+          end
+
+          # The actual decorator method gathers the arguments (and the block)…
+          define_method(name) do |*args, &block|
+            self.instance_eval do
+
+              # … and passes them through to the subclass' constructor.
+              deco = decorator.new(*args, &block)
+              meta = (class << self; self; end)
+              define = :define_method
+
+              # We create hooks to handle added instance and class methods,
+              # caching the existing methods before we do.
+              hooks = {
+                :method_added           => { :into => self },
+                :singleton_method_added => { :into => meta },
+              }
+              hooks.each { |k,v| v[:orig] = method(k) }
+
+              # We have to do a little work to avoid recursion…
+              hooks.each do |hook, opts|
+                already_called = false
+                meta.send(define, hook) do |m|
+                  return if already_called || hooks.include?(m)
+                  already_called = true
+
+                  # … but when a new method is declared, we wrap it with the
+                  # newly created decorator instance…
+                  wrapped = deco.wrap_callable(opts[:into].instance_method(m))
+                  opts[:into].send(define, m, wrapped)
+
+                  # … restore the original hooks, and recurse.  Since each
+                  # decorator restores the hook to its previous state, we'll
+                  # terminate after invoking each applicable decorator.
+                  hooks.each { |k,v| meta.send(define, k, v[:orig]) }
+                  send(hook, m)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
   end
 end
