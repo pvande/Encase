@@ -20,7 +20,13 @@ module Encase
     def self.module(name=self.name)
       raise "Can't automatically detect name of anonymous classes" if name.nil?
       name = "#{name}"[/[^:]*$/]
-      @modules[self][name]
+      mod = @modules[self][name]
+      Module.new do
+        # We want to include methods *only* into the class, not the instances.
+        (class << self; self; end).send(:define_method, :included) do |base|
+          base.extend(mod)
+        end
+      end
     end
 
     # Wraps the given callable object in a Proc that passes it through to the
@@ -79,12 +85,6 @@ module Encase
     @modules = Hash.new do |hash, decorator|
       hash[decorator] = Hash.new do |hash, name|
         hash[name] = Module.new do
-
-          # We're interested in seeing decorators at the class level, so we
-          # extend the class with the methods from this module.
-          def self.included(base)
-            base.extend(self)
-          end
 
           # The actual decorator method gathers the arguments (and the block)…
           define_method(name) do |*args, &block|

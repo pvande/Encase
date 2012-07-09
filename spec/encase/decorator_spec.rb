@@ -19,15 +19,30 @@ describe Encase::Decorator do
     after { Object.send :remove_const, :Disposable }
 
     it 'should create a module with a self-named function' do
-      subject.module.instance_methods.map(&:to_s).should include('Disposable')
+      have_function = include('Disposable')
+      Class.new do
+        include Disposable.module
+        self.instance_methods.map(&:to_s).should_not have_function
+        self.methods.map(&:to_s).should have_function
+      end
     end
 
     it 'should create a module with a self-named function despite namespace' do
-      subject::Diaper.module.instance_methods.map(&:to_s).should include('Diaper')
+      have_function = include('Diaper')
+      Class.new do
+        include Disposable::Diaper.module
+        self.instance_methods.map(&:to_s).should_not have_function
+        self.methods.map(&:to_s).should have_function
+      end
     end
 
     it 'should create a module with a named function if given a name' do
-      subject.module(:Foo).instance_methods.map(&:to_s).should include('Foo')
+      have_function = include('Foo')
+      Class.new do
+        include Disposable.module(:Foo)
+        self.instance_methods.map(&:to_s).should_not have_function
+        self.methods.map(&:to_s).should have_function
+      end
     end
 
     it 'should refuse to autoname a dynamic subclass' do
