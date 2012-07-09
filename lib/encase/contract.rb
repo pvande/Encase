@@ -103,29 +103,29 @@ module Encase
         not (result ? success(data) : failure(data))
       end.nil?
     end
-  end
 
-  # Raised by the default implementation of {Contract#failure}, this exception
-  # represents an attempt to improperly invoke a function with an explicit
-  # type contract.
-  #
-  # This deliberately subclasses Exception to avoid being accidentally
-  # swallowed by overzealous +rescue+ blocks.
-  class ContractViolationException < Exception
-    def initialize(data)
-      msg = "\nContract Violation for "
-      msg += if decorated_class.ancestors.include?(Class)
-        "#{decorated_class.inspect[/^#<Class:(.*)>$/, 1]}.#{decorated_method}:"
-      else
-        "#{decorated_class}##{decorated_method}:"
+    # Raised by the default implementation of {Contract#failure}, this
+    # exception represents an attempt to improperly invoke a function with an
+    # explicit type contract.
+    #
+    # This deliberately subclasses Exception to avoid being accidentally
+    # swallowed by overzealous +rescue+ blocks.
+    class ContractViolationException < Exception
+      def initialize(data)
+        msg = "\nContract Violation for "
+        msg += if decorated_class.ancestors.include?(Class)
+          "#{decorated_class.inspect[/^#<Class:(.*)>$/, 1]}.#{decorated_method}:"
+        else
+          "#{decorated_class}##{decorated_method}:"
+        end
+        msg += "\n(declared in #{location})"
+        msg += "\n  Contract #{@matchers[:args].join(', ')}"
+        msg += " => #{@matchers[:return]}" if @matchers.has_key? :return
+        msg += "\n  Expected #{data[:matcher].inspect}"
+        msg += "\n  Received #{data[:value].inspect}"
+
+        super msg
       end
-      msg += "\n(declared in #{location})"
-      msg += "\n  Contract #{@matchers[:args].join(', ')}"
-      msg += " => #{@matchers[:return]}" if @matchers.has_key? :return
-      msg += "\n  Expected #{data[:matcher].inspect}"
-      msg += "\n  Received #{data[:value].inspect}"
-
-      super msg
     end
   end
 end

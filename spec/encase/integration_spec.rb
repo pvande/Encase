@@ -1,4 +1,4 @@
-require 'encase/contract'
+require 'encase'
 
 class IntegrationPoint
   include Encase::Contract.module
