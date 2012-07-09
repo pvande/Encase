@@ -4,6 +4,15 @@ module Encase
   # their behavior.
   class Decorator
 
+    # @return [String] Location of the line that applied this decorator.
+    attr_accessor :location
+
+    # @return [Class] The class containing the decorated method.
+    attr_accessor :decorated_class
+
+    # @return [String] The name of the decorated method.
+    attr_accessor :decorated_method
+
     # Generate a module containing a method for applying the decorator.  This
     # may be named explicitly, but defaults to the same name as the class.
     # @param name [#to_s] the name of the decorator method
@@ -27,6 +36,8 @@ module Encase
     end
 
     private
+
+    # @!group Decorator Callbacks
 
     # Called from the wrapper Proc.
     # @api extender Intended to be an extension point for subclasses
@@ -54,6 +65,8 @@ module Encase
     # @param retval [Any] the result of having called +code+
     def after(code, args, block, retval); end
 
+    # @!endgroup
+
     # Propagate the +@modules+ variable to Decorator subclasses.
     # @param klass [Class] the subclass of {Decorator}
     def self.inherited(klass)
@@ -75,10 +88,13 @@ module Encase
 
           # The actual decorator method gathers the arguments (and the block)…
           define_method(name) do |*args, &block|
-            self.instance_eval do
 
-              # … and passes them through to the subclass' constructor.
-              deco = decorator.new(*args, &block)
+            # … and passes them through to the subclass' constructor.  We
+            # also want to persist the location we were called from.
+            deco = decorator.new(*args, &block)
+            deco.location = caller(1)[0]
+
+            self.instance_eval do
               meta = (class << self; self; end)
               define = :define_method
 
@@ -96,6 +112,10 @@ module Encase
                 meta.send(define, hook) do |m|
                   return if already_called || hooks.include?(m)
                   already_called = true
+
+                  # … and to persist debugging information…
+                  deco.decorated_class  = opts[:into]
+                  deco.decorated_method = m.to_s
 
                   # … but when a new method is declared, we wrap it with the
                   # newly created decorator instance…

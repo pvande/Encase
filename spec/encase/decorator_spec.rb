@@ -38,6 +38,14 @@ describe Encase::Decorator do
       subject { Class.new { include Disposable.module } }
       let(:metaclass) { class << subject; self; end }
 
+      def decorator
+        double(
+          :location= => nil,
+          :decorated_class= => nil,
+          :decorated_method= => nil
+        )
+      end
+
       it 'should wrap existing method_added hooks' do
         Disposable.any_instance.should_receive(:wrap_callable).and_return(proc)
         subject.should_receive(:method_added).with(:foo)
@@ -71,9 +79,9 @@ describe Encase::Decorator do
       end
 
       it 'should allow multiple decorators' do
-        Disposable.should_receive(:new).with(1).and_return(a = double)
-        Disposable.should_receive(:new).with(2).and_return(b = double)
-        Disposable.should_receive(:new).with(3).and_return(c = double)
+        Disposable.should_receive(:new).with(1).and_return(a = decorator)
+        Disposable.should_receive(:new).with(2).and_return(b = decorator)
+        Disposable.should_receive(:new).with(3).and_return(c = decorator)
 
         c.should_receive(:wrap_callable).ordered { |x| "#{x.name}".should == 'foo'; proc }
         b.should_receive(:wrap_callable).ordered { |x| "#{x.name}".should == 'foo'; proc }
@@ -88,10 +96,10 @@ describe Encase::Decorator do
       end
 
       it 'should allow multiple decorators across multiple instance methods' do
-        Disposable.should_receive(:new).with(1).and_return(a = double)
-        Disposable.should_receive(:new).with(2).and_return(b = double)
-        Disposable.should_receive(:new).with(3).and_return(c = double)
-        Disposable.should_receive(:new).with(4).and_return(d = double)
+        Disposable.should_receive(:new).with(1).and_return(a = decorator)
+        Disposable.should_receive(:new).with(2).and_return(b = decorator)
+        Disposable.should_receive(:new).with(3).and_return(c = decorator)
+        Disposable.should_receive(:new).with(4).and_return(d = decorator)
 
         b.should_receive(:wrap_callable).ordered { |x| "#{x.name}".should == 'foo'; proc }
         a.should_receive(:wrap_callable).ordered { |x| "#{x.name}".should == 'foo'; proc }
@@ -110,10 +118,10 @@ describe Encase::Decorator do
       end
 
       it 'should allow multiple decorators across multiple mixed methods' do
-        Disposable.should_receive(:new).with(1).and_return(a = double)
-        Disposable.should_receive(:new).with(2).and_return(b = double)
-        Disposable.should_receive(:new).with(3).and_return(c = double)
-        Disposable.should_receive(:new).with(4).and_return(d = double)
+        Disposable.should_receive(:new).with(1).and_return(a = decorator)
+        Disposable.should_receive(:new).with(2).and_return(b = decorator)
+        Disposable.should_receive(:new).with(3).and_return(c = decorator)
+        Disposable.should_receive(:new).with(4).and_return(d = decorator)
 
         b.should_receive(:wrap_callable).ordered { |x| "#{x.name}".should == 'foo'; proc }
         a.should_receive(:wrap_callable).ordered { |x| "#{x.name}".should == 'foo'; proc }
