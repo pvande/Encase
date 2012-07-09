@@ -41,7 +41,7 @@ module Encase
     # Truthy return values will allow proceed as normal, while falsey return
     # values will arrest further execution.
     # @param data [Hash] information about the successful comparison
-    # @return +true+
+    # @return [Bool] always returns +true+
     def success(data)
       true
     end
@@ -51,6 +51,7 @@ module Encase
     # Truthy return values will allow proceed as normal, while falsey return
     # values will arrest further execution.
     # @param data [Hash] information about the successful comparison
+    # @return [Bool] always raises exception
     def failure(data)
       raise ContractViolationException.new(data)
     end
@@ -61,6 +62,10 @@ module Encase
 
     # Decorates the wrapped callable with paramater and return value
     # validations.  Returns +nil+ if any validation callback returns false.
+    # @param (see Decorator#around)
+    # @return [Object] if all validations succeed, this method returns the
+    #         result of calling +code+
+    # @return [nil] if any validation fails
     # @see #success
     # @see #failure
     # @see Decorator#around
@@ -72,6 +77,13 @@ module Encase
         end
       end
     end
+
+    # These methods are obsoleted by this subclass.
+    # @!method before
+    #   @obsolete
+    # @!method after
+    #   @obsolete
+    undef_method :before, :after
 
     # @!endgroup
 

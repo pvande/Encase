@@ -1,7 +1,7 @@
 require 'encase'
 
 class IntegrationPoint
-  include Encase::Contract.module
+  include Encase::Contracts
 
   Contract String
   def self.no_return_validation(str)

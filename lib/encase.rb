@@ -1,1 +1,2 @@
-require 'encase/contract'
+module Encase; end
+require 'encase/contracts'

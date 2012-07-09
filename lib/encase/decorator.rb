@@ -75,6 +75,7 @@ module Encase
 
     # Propagate the +@modules+ variable to Decorator subclasses.
     # @param klass [Class] the subclass of {Decorator}
+    # @implicit
     def self.inherited(klass)
       klass.instance_variable_set(:@modules, @modules)
     end
