@@ -38,6 +38,11 @@ class IntegrationPoint
   def options_destructuring(n, opts)
     n.times { opts[:str] =~ opts[:re] }
   end
+
+  Contract Splat[Fixnum] => Fixnum
+  def sum(*args)
+    args.inject(0) { |a,b| a + b }
+  end
 end
 
 describe IntegrationPoint do
@@ -59,6 +64,9 @@ describe IntegrationPoint do
       subject.hash_destructuring(4, { :str => 'x', :re => /f/, :x => :y }).should == [8]
       subject.options_destructuring(3, :str => 'x', :re => /f/).should == 3
       subject.options_destructuring(3, :str => 'x', :re => /f/, :x => :y).should == 3
+      subject.sum().should == 0
+      subject.sum(1).should == 1
+      subject.sum(1, 2, 3).should == 6
     end.to_not raise_exception
   end
 
@@ -105,5 +113,9 @@ describe IntegrationPoint do
     expect { subject.options_destructuring(2, { :str => 'x', :re => 'f' }) }.to raise_exception
     expect { subject.options_destructuring(2, { :str => 'x' }) }.to raise_exception
     expect { subject.options_destructuring(2, { :re => /f/ }) }.to raise_exception
+
+    expect { subject.sum([1, 2, 3]) }.to raise_exception
+    expect { subject.sum('1') }.to raise_exception
+    expect { subject.sum(1, 2, '3') }.to raise_exception
   end
 end
