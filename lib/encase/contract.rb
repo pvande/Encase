@@ -1,36 +1,59 @@
 require 'encase/decorator'
+require 'encase/contracts'
 
 module Encase
   # A Contract is a type of Decorator for describing the expected inputs and
   # outputs of a function or method.  In statically typed languages, these
-  # contracts are typically validated at compile time; in the Decorator-based
-  # implementation, we defer most of the validation as late as possible.  This
-  # gives us the ability to describe a much richer type system, at the cost of
-  # not being able to statically prove our software "correct".
+  # constraints are typically validated at compile time; i  n the
+  # Decorator-based implementation, we defer most of the validation as late as
+  # possible.  This gives us the ability to describe a much richer type
+  # system, at the cost of not being able to statically prove our software
+  # "correct".
   #
-  # If you're interested in changing the behavior of contract validation (e.g.
-  # cause failures to generate warnings instead of errors), the {#success} and
-  # {#failure} callbacks are invoked following the validation of each value,
-  # and can easily be overridden.  Returning a +false+ value from either
-  # callback will prevent further execution, while returning a +true+ value
-  # will allow execution to continue.
+  # If you're interested in changing the behavior of constraint validation
+  # (e.g. cause failures to generate warnings instead of errors), the
+  # {#success} and {#failure} callbacks are invoked following the validation
+  # of each value, and can easily be overridden.  Returning a `false` value
+  # from either callback will prevent further execution, while returning a
+  # `true` value will allow execution to continue.
   class Contract < Decorator
+
+    # Exposes the constraints enforced by this Contract.
+    attr_accessor :constraints
 
     # Create a new Contract with the given arguments.  These arguments will be
     # validated against the arguments of the wrapped callable.  If the last
-    # argument is a single-element Hash, the key of that hash is used as the
-    # final argument validator, and the value of that hash is used to validate
-    # the return value.  This allows you to write Contracts that read more
-    # clearly in most common cases.
-    # @param args [Array[#===]] a list of parameter matchers
+    # argument is an instance of the {Contracts::Returns} type, will be used
+    # to validate the return value of the callable.  As a shorthand, if the
+    # last argument is a single-element Hash, it will be destructured into a
+    # (final argument, returned value) pair.  This allows you to write
+    # Contracts that read more clearly in most common cases.
+    #
+    # @example Explicit {Contracts::Returns} Type
+    #   Contract.new Returns[String]
+    #   Contract.new String, Fixnum, { :count => Fixnum }, Returns[String]
+    # @example Shorthand Return Type Validation
+    #   Contract.new Fixnum, Fixnum => Fixnum
+    # @param args [Array[#===]] a list of parameter constraints
     def initialize(*args)
       if args.last.is_a?(Hash) && args.last.size == 1
-        @matchers = {
+        self.constraints = {
           :args   => args[0...-1] + args.last.keys,
           :return => args.last.values.last
         }
       else
-        @matchers = { :args => args }
+        self.constraints = { :args => args }
+      end
+
+      # Check for superfluous {Returns}
+      if constraints[:args].find { |c| c.is_a? Encase::Contracts::Returns }
+        raise MalformedContractError.new self,
+          "Unexpected `Returns` in argument list."
+      end
+      if constraints[:args].find { |c| c == Encase::Contracts::Returns }
+        raise MalformedContractError.new self,
+          "`Returns` is not a constraint; " +
+          "please supply a parameter (e.g. `Returns[String]`)"
       end
     end
 
@@ -41,7 +64,7 @@ module Encase
     # Truthy return values will allow proceed as normal, while falsey return
     # values will arrest further execution.
     # @param data [Hash] information about the successful comparison
-    # @return [Bool] always returns +true+
+    # @return [Boolean] always returns `true`
     def success(data)
       true
     end
@@ -51,9 +74,9 @@ module Encase
     # Truthy return values will allow proceed as normal, while falsey return
     # values will arrest further execution.
     # @param data [Hash] information about the successful comparison
-    # @return [Bool] always raises exception
+    # @return [Boolean] always raises exception
     def failure(data)
-      raise ContractViolationException.new(data)
+      raise ContractViolationException.new(self, data)
     end
 
     private
@@ -61,19 +84,19 @@ module Encase
     # @!group Decorator Overrides
 
     # Decorates the wrapped callable with paramater and return value
-    # validations.  Returns +nil+ if any validation callback returns false.
+    # validations.  Returns `nil` if any validation callback returns false.
     # @param (see Decorator#around)
     # @return [Object] if all validations succeed, this method returns the
-    #         result of calling +code+
+    #         result of calling `code`
     # @return [nil] if any validation fails
     # @see #success
     # @see #failure
     # @see Decorator#around
     def around(code, args, block)
-      return unless validate(@matchers[:args], args)
+      return unless validate(constraints[:args], args)
       code.call(*args, &block).tap do |retval|
-        if @matchers.has_key?(:return)
-          return unless validate([@matchers[:return]], [retval])
+        if constraints.has_key?(:return)
+          return unless validate([constraints[:return]], [retval])
         end
       end
     end
@@ -88,54 +111,80 @@ module Encase
     # @!endgroup
 
     # Handle the actual work of validation.  For the common case, this is as
-    # simple as comparing the elements of the +matchers+ list against the
-    # values of the +args+ list.  That approach works fine for simple lists,
-    # but we also try to do basic destructuring as well, recursively validating
-    # Arrays and Hashes.
-    # @param matchers [Array[#===|Array|Hash]] the set of matchers for
+    # simple as comparing the elements of the `constraints` list against the
+    # values of the `args` list.  That approach works fine for simple lists,
+    # but we also try to do basic destructuring as well, recursively
+    # validating Arrays and Hashes.
+    # @param constraints [Array[#===|Array|Hash]] the set of constraints for
     #        parameter validation
-    # @param args [Array] the set of values for parameter validation
-    # @return [Bool] the result of the validation
-    def validate(matchers, args)
-      unless args.size == matchers.size
-        return failure(:matcher => matchers, :value => args, :loc => location)
+    # @param args [Array] the set of values for parameter validation @return
+    # [Boolean] the result of the validation
+    def validate(constraints, args)
+      unless args.size == constraints.size
+        return failure :constraint => constraints,
+                       :value => args,
+                       :loc => location
       end
 
-      matchers.zip(args).find do |match, arg|
-        result = if match.is_a? Array
-          validate(match, arg) if arg.is_a?(Array)
-        elsif match.is_a?(Hash) && arg.is_a?(Hash)
-          validate(*match.keys.map { |k| [match[k], arg[k]] }.transpose)
+      constraints.zip(args).find do |const, arg|
+        result = if const.is_a? Array
+          validate(const, arg) if arg.is_a?(Array)
+        elsif const.is_a?(Hash) && arg.is_a?(Hash)
+          validate(*const.keys.map { |k| [const[k], arg[k]] }.transpose)
         else
-          # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it.
-          match.is_a?(Proc) ? match[arg] : match === arg
+          # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
+          const.is_a?(Proc) ? const[arg] : const === arg
         end
 
-        data = { :matcher => match, :value => arg, :loc => location }
+        data = { :constraint => const, :value => arg, :loc => location }
         not (result ? success(data) : failure(data))
       end.nil?
     end
 
     # Raised by the default implementation of {Contract#failure}, this
     # exception represents an attempt to improperly invoke a function with an
-    # explicit type contract.
+    # explicit type constraint.
     #
     # This deliberately subclasses Exception to avoid being accidentally
-    # swallowed by overzealous +rescue+ blocks.
+    # swallowed by overzealous `rescue` blocks.
     class ContractViolationException < Exception
-      def initialize(data)
+      def initialize(contract, data)
+        klass       = contract.decorated_class
+        method      = contract.decorated_method
+        location    = contract.location
+        constraints = contract.constraints
+
         msg = "\nContract Violation for "
-        msg += if decorated_class.ancestors.include?(Class)
-          "#{decorated_class.inspect[/^#<Class:(.*)>$/, 1]}.#{decorated_method}:"
+        msg += if klass.ancestors.include?(Class)
+          "#{klass.inspect[/^#<Class:(.*)>$/,1]}.#{method}:"
         else
-          "#{decorated_class}##{decorated_method}:"
+          "#{klass}##{method}:"
         end
         msg += "\n(declared in #{location})"
-        msg += "\n  Contract #{@matchers[:args].join(', ')}"
-        msg += " => #{@matchers[:return]}" if @matchers.has_key? :return
-        msg += "\n  Expected #{data[:matcher].inspect}"
+        msg += "\n  Contract #{constraints[:args].join(', ')}"
+        msg += " => #{constraints[:return]}" if constraints.has_key? :return
+        msg += "\n  Expected #{data[:constraint].inspect}"
         msg += "\n  Received #{data[:value].inspect}"
 
+        super msg
+      end
+    end
+
+    # This is raised by the constructor when the passed parameters cannot be
+    # sensibly interpreted.  The current set of cases which may raise this
+    # exception are as follows:
+    #
+    #   * An instance of {Contracts::Returns} used as a non-terminal constraint
+    #   * {Contracts::Returns} itself used as a constraint
+    class MalformedContractError < StandardError
+      def initialize(contract, message)
+        constraints = contract.constraints
+
+        msg = "\nMalformed Contract for"
+        msg += "\n  Contract #{constraints[:args].join(', ')}"
+        msg += " => #{constraints[:return]}" if constraints.has_key? :return
+        msg += "\n  #{message}"
+        
         super msg
       end
     end

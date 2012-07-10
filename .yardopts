@@ -1,4 +1,5 @@
 --private
+--markup markdown
 --name-tag 'api:API Description'
 --tag 'implicit' --query '!@implicit'
 --tag 'obsolete' --query '!@obsolete'

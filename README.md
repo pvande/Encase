@@ -30,7 +30,7 @@ def greater_than_three(x)
 end
 ```
 
-Technically, almost anything that can be compared with the `===` operator can be used in a contract, making it easy to specify robust signatures and extend the type system to meet your needs.
+Technically, almost anything that can be compared with the `===` operator can be used as a constraint in a contract, making it easy to specify robust signatures and extend the type system to meet your needs.
 
 ``` ruby
 Contract /^-?\d+$/ => Num

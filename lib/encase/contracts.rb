@@ -6,42 +6,109 @@ require 'encase/contract'
 # statically-checked type systems – both provide guarantees about how data
 # flows across method boundaries.
 #
-# @example A Basic Contract
-#   Contract Fixnum, Fixnum => Fixnum
-#   def sum_and_triple(a, b)
-#     (a + b) * 3
-#   end
+#     Contract Fixnum, Fixnum => Fixnum
+#     def sum_and_triple(a, b)
+#       (a + b) * 3
+#     end
 #
 # One advantage to resolving these constraints at runtime is that it allows
 # you to leverage the full expressiveness of the host language when describing
-# your method's contract.  In fact, these contracts are using Ruby's case
-# equality operator to validate constraints, so leveraging your existing code
-# is simple, and writing new constraint types is easy.
+# your method's contract.
 #
-# @example Dynamic Contracts
-#   Contract /^\d{1,3}$/ => (0...1000)
-#   def parse_number(str)
-#     str.to_i(10)
-#   end
-#
-# @example Custom Constraints
-#   class Wacky
-#     def initialize(range)
-#       @range = range
+#     Contract /^\d{1,3}$/ => (0...1000)
+#     def parse_number(str)
+#       str.to_i(10)
 #     end
-#     def ===(o)
-#       o.respond_to?(:wackiness) && @range.include?(o.wackiness)
-#     end
-#   end
 #
-#   Contract Wacky(3..9000) => Wacky(0...1)
-#   def dewackify(object)
-#     object.wackiness.times { object.calm_down }
-#   end
+# In fact, these contracts are using Ruby's case equality operator to validate
+# constraints, so leveraging your existing code is simple, and writing new
+# constraint types is easy.
+#
+#     class Wacky
+#       def initialize(range)
+#         @range = range
+#       end
+#
+#       def ===(o)
+#         o.respond_to?(:wackiness) && @range.include?(o.wackiness)
+#       end
+#     end
+#
+#     Contract Wacky(3..9000) => Wacky(0...1)
+#     def dewackify(object)
+#       object.wackiness.times { object.calm_down }
+#     end
+#
+# For convenience, there are also a number of meta-typeclasses included in
+# this library.
+#
+# Signature constraints
+# ==================
+#
+# * <h2>`Returns[<Type>]`</h2>
+# {include:Contracts::Returns}
 module Encase::Contracts
-  # Including this module will include the +Contract+ decorator method.
-  # @param base [Class] the class including this module
+
+  # This constraint allows you to write a contract for the return value of the
+  # method or proc.  Most of the time, you will probably prefer to use the
+  # shorthand for this type.
+  #
+  #     # This describes code that takes a String and returns a String.
+  #     Contract String, Returns[String]
+  #
+  #     # This describes the same thing.
+  #     Contract String => String
+  #
+  # The shorthand is generally considered preferable, but falls short when
+  # describing a function that takes no arguments…
+  #
+  #     # This describes code that takes nil and returns a String!
+  #     Contract nil => String
+  #
+  #     # This describes code that takes an empty list and returns a String!
+  #     Contract [] => String
+  #
+  #     # This describes code that takes no arguments and returns a String.
+  #     Contract Returns[String]
+  #
+  # … and in the case where the last constraint is a Hash containing only a
+  # single constraint.
+  #
+  #     # This describes code that takes a String and a Hash containing the
+  #     # keys :path and :name (with a String values).  There is no constraint
+  #     # on the returned value.
+  #     Contract String, { :path => String, :name => String }
+  #
+  #     # This describes code that takes both a String and the Symbol :path
+  #     # and returns a String!
+  #     Contract String, { :path => String }
+  #
+  #     # This describes code that takes both a String and a Hash containing
+  #     # the key :path (with a String value), and returning a String.
+  #     Contract String, { :path => String }, Returns[String]
+  #
+  # This constraint type is only useful as the last argument to `Contract`.
+  class Returns < Hash
+    # Creates a new constraint for describing the type of the value returned
+    # from the Contracted code.
+    # @param type [#===|Array|Hash] the constraint for the return value
+    # @return [Returns<type>] a constraint that only validates the return value
+    def self.[](type)
+      super(nil, type)
+    end
+
+    # @implicit
+    # Allows us to avoid adding any additional parameter constraints.
+    def keys; []; end
+
+    # @implicit
+    # Provide a recognizable string representation.
+    def to_s; "Returns#{values}"; end
+  end
+
   # @implicit
+  # Including this module will include the `Contract` decorator method.
+  # @param base [Class] the class including this module
   def self.included(base)
     base.send(:include, Encase::Contract.module)
   end

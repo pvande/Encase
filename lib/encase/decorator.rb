@@ -50,7 +50,7 @@ module Encase
     # @param code [#call] the callable being augmented
     # @param args [Array[Any]] the arguments the wrapper was invoked with
     # @param block [Proc] the block the wrapper was invoked with
-    # @return the result of calling +code+
+    # @return the result of calling `code`
     def around(code, args, block)
       before(code, args, block)
       code.call(*args, &block).tap do |retval|
@@ -68,14 +68,14 @@ module Encase
     # @param code [#call] the callable being augmented
     # @param args [Array[Any]] the arguments the wrapper was invoked with
     # @param block [Proc] the block the wrapper was invoked with
-    # @param retval [Any] the result of having called +code+
+    # @param retval [Any] the result of having called `code`
     def after(code, args, block, retval); end
 
     # @!endgroup
 
-    # Propagate the +@modules+ variable to Decorator subclasses.
-    # @param klass [Class] the subclass of {Decorator}
     # @implicit
+    # Propagate the `@modules` variable to Decorator subclasses.
+    # @param klass [Class] the subclass of {Decorator}
     def self.inherited(klass)
       klass.instance_variable_set(:@modules, @modules)
     end
