@@ -42,12 +42,48 @@ require 'encase/contract'
 # For convenience, there are also a number of meta-typeclasses included in
 # this library.
 #
-# Signature constraints
-# ==================
+# Signature Constraints
+# =====================
 #
+# * <h2>`Splat[<Type>]`</h2>
+# {include:Contracts::Splat}
 # * <h2>`Returns[<Type>]`</h2>
 # {include:Contracts::Returns}
 module Encase::Contracts
+
+  # A {Splat} stands in for zero or more positional arguments, just as the
+  # Ruby `*args` construct does, allowing you to write constraints for
+  # open-ended method signatures.
+  #
+  #     Contract Splat[Fixnum] => Fixnum
+  #     def sum(*numbers)
+  #       numbers.inject { |a,b| a + b }
+  #     end
+  class Splat
+    # Creates a new constraint for describing the type of the value returned
+    # from the Contracted code.
+    # @param type [#===|Array|Hash] the constraint to apply to the arguments
+    # @return [Splat<type>] a constraint that validates zero or more arguments
+    def self.[](type)
+      self.new(type)
+    end
+
+    # @implicit
+    def initialize(type)
+      @type = type
+    end
+
+    # Validate that all splatted arguments conform to the given interface.
+    # @param args [Array[#===|Array|Hash]] the arguments to validate
+    # @return [Boolean] the result of the validation
+    def ===(args)
+      @type === args
+    end
+
+    # @implicit
+    # Provide a recognizable string representation.
+    def inspect; "Splat[#{@type.inspect}]"; end
+  end
 
   # This constraint allows you to write a contract for the return value of the
   # method or proc.  Most of the time, you will probably prefer to use the
@@ -103,7 +139,7 @@ module Encase::Contracts
 
     # @implicit
     # Provide a recognizable string representation.
-    def to_s; "Returns#{values}"; end
+    def inspect; "Returns#{values.inspect}"; end
   end
 
   # @implicit

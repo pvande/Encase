@@ -44,17 +44,22 @@ module Encase
       else
         self.constraints = { :args => args }
       end
+      args = constraints[:args]
 
       # Check for superfluous {Returns}
-      if constraints[:args].find { |c| c.is_a? Encase::Contracts::Returns }
+      type = Encase::Contracts::Returns
+      if args.find { |c| c.is_a?(type) }
         raise MalformedContractError.new self,
-          "Unexpected `Returns` in argument list."
+          "Unexpected `#{type.inspect}` in argument list."
       end
-      if constraints[:args].find { |c| c == Encase::Contracts::Returns }
+      if args.find { |c| c == type }
         raise MalformedContractError.new self,
-          "`Returns` is not a constraint; " +
-          "please supply a parameter (e.g. `Returns[String]`)"
+          "`#{type.inspect}` is not a constraint; " +
+          "please supply a parameter (e.g. `#{type.inspect}[String]`)"
       end
+
+      # Check for superfluous {Splat}
+      find_overzealous_splats(args)
     end
 
     # @!group Contract Validation Callbacks
@@ -117,16 +122,33 @@ module Encase
     # validating Arrays and Hashes.
     # @param constraints [Array[#===|Array|Hash]] the set of constraints for
     #        parameter validation
-    # @param args [Array] the set of values for parameter validation @return
-    # [Boolean] the result of the validation
+    # @param args [Array] the set of values for parameter validation
+    # @return [Boolean] the result of the validation
     def validate(constraints, args)
-      unless args.size == constraints.size
-        return failure :constraint => constraints,
-                       :value => args,
-                       :loc => location
-      end
+      wrong_argument_count = { :constraint => constraints,
+                               :value => args,
+                               :loc => location }
 
-      constraints.zip(args).find do |const, arg|
+      constraints, args = constraints.dup, args.dup
+
+      while true
+        if args.empty?
+          valid_types = [ [], [Encase::Contracts::Splat] ]
+          return true if valid_types.include?(constraints.map(&:class))
+        else
+          return failure(wrong_argument_count) if constraints.empty?
+        end
+
+        if constraints[0].is_a?(Encase::Contracts::Splat)
+          if constraints.size < args.size
+            constraints.unshift(constraints[0])
+          elsif constraints.size > args.size
+            constraints.shift
+          end
+        end
+
+        const, arg = constraints.shift, args.shift
+
         result = if const.is_a? Array
           validate(const, arg) if arg.is_a?(Array)
         elsif const.is_a?(Hash) && arg.is_a?(Hash)
@@ -137,8 +159,46 @@ module Encase
         end
 
         data = { :constraint => const, :value => arg, :loc => location }
-        not (result ? success(data) : failure(data))
-      end.nil?
+        return false unless (result ? success(data) : failure(data))
+      end
+    end
+
+    # Handle discovery of overzealous application of the Splat type.  In
+    # particular there's no good way to resolve a list with more than one
+    # splat; in an effort to discourage ambiguous contracts, we'll fail if we
+    # see two Splats in a single list.
+    # @param args [Array[#===|Array|Hash]] the constraints to validate
+    # @return [void]
+    def find_overzealous_splats(args)
+      seen_splats = 0
+      args.each do |arg|
+        if arg == Encase::Contracts::Splat
+           raise MalformedContractError.new self,
+             "`Splat` is not a constraint; " +
+             "please supply a parameter (e.g. `Splat[String]`)"
+        end
+
+        case arg
+        when Array
+          find_overzealous_splats(arg)
+        when Hash
+          arg.values.each do |v|
+            case v
+            when Array
+              find_overzealous_splats(v)
+            when Encase::Contracts::Splat
+              raise MalformedContractError.new self,
+                "`Splat` cannot be used as a Hash value; " +
+                "try wrapping it in an array first (e.g. `[Splat[String]]`)"
+            end
+          end
+        when Encase::Contracts::Splat
+          if (seen_splats += 1) > 1
+            raise MalformedContractError.new self,
+              "Only one `Splat` can be used in each list in a contract"
+          end
+        end
+      end
     end
 
     # Raised by the default implementation of {Contract#failure}, this
@@ -161,7 +221,7 @@ module Encase
           "#{klass}##{method}:"
         end
         msg += "\n(declared in #{location})"
-        msg += "\n  Contract #{constraints[:args].join(', ')}"
+        msg += "\n  Contract #{constraints[:args].map(&:inspect).join(', ')}"
         msg += " => #{constraints[:return]}" if constraints.has_key? :return
         msg += "\n  Expected #{data[:constraint].inspect}"
         msg += "\n  Received #{data[:value].inspect}"
@@ -181,7 +241,7 @@ module Encase
         constraints = contract.constraints
 
         msg = "\nMalformed Contract for"
-        msg += "\n  Contract #{constraints[:args].join(', ')}"
+        msg += "\n  Contract #{constraints[:args].map(&:inspect).join(', ')}"
         msg += " => #{constraints[:return]}" if constraints.has_key? :return
         msg += "\n  #{message}"
         
