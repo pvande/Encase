@@ -73,11 +73,11 @@ module Encase::Contracts
       @type = type
     end
 
-    # Validate that all splatted arguments conform to the given interface.
-    # @param args [Array[#===|Array|Hash]] the arguments to validate
+    # Validate that an arguments conforms to the given interface.
+    # @param val [#===|Array|Hash] the value to validate
     # @return [Boolean] the result of the validation
-    def ===(args)
-      @type === args
+    def ===(val)
+      @type === val
     end
 
     # @implicit
@@ -131,6 +131,13 @@ module Encase::Contracts
     # @return [Returns<type>] a constraint that only validates the return value
     def self.[](type)
       super(nil, type)
+    end
+
+    # Validate that the return value conforms to the given interface.
+    # @param val [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(val)
+      values.first === val
     end
 
     # @implicit

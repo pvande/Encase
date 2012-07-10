@@ -217,6 +217,24 @@ describe Encase::Contracts::Returns do
     expect do
       contract(Returns[String], nil)
     end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract([ Returns[String] ])
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract({ :a => Returns[String] }, nil)
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract({ :a => [Returns[String]] }, nil)
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    # Wrong, but we should be forgiving.
+    expect { contract(Fixnum => Returns[String]) }.to_not raise_exception
+
+    # This should be obviously wrong, but we're still about being forgiving.
+    expect { contract(Returns[Returns[String]]) }.to_not raise_exception
   end
 
   it 'should raise an exception when not given a parameter' do
@@ -226,6 +244,26 @@ describe Encase::Contracts::Returns do
 
     expect do
       contract(Returns)
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract([ Returns ])
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract({ :a => Returns }, nil)
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract({ :a => [Returns] }, nil)
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract(Fixnum => Returns)
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract(Returns[Returns])
     end.to raise_exception(Encase::Contract::MalformedContractError)
   end
 end

@@ -44,22 +44,15 @@ module Encase
       else
         self.constraints = { :args => args }
       end
-      args = constraints[:args]
 
       # Check for superfluous {Returns}
-      type = Encase::Contracts::Returns
-      if args.find { |c| c.is_a?(type) }
-        raise MalformedContractError.new self,
-          "Unexpected `#{type.inspect}` in argument list."
-      end
-      if args.find { |c| c == type }
-        raise MalformedContractError.new self,
-          "`#{type.inspect}` is not a constraint; " +
-          "please supply a parameter (e.g. `#{type.inspect}[String]`)"
+      find_overzealous_returns(constraints[:args])
+      if constraints[:return] == Encase::Contracts::Returns
+        find_overzealous_returns([constraints[:return]])
       end
 
       # Check for superfluous {Splat}
-      find_overzealous_splats(args)
+      find_overzealous_splats(constraints[:args])
     end
 
     # @!group Contract Validation Callbacks
@@ -134,7 +127,7 @@ module Encase
       while true
         if args.empty?
           valid_types = [ [], [Encase::Contracts::Splat] ]
-          return true if valid_types.include?(constraints.map(&:class))
+          return true if valid_types.include? constraints.map(&:class)
         else
           return failure(wrong_argument_count) if constraints.empty?
         end
@@ -163,22 +156,67 @@ module Encase
       end
     end
 
-    # Handle discovery of overzealous application of the Splat type.  In
-    # particular there's no good way to resolve a list with more than one
-    # splat; in an effort to discourage ambiguous contracts, we'll fail if we
-    # see two Splats in a single list.
+    # Handle discovery of overzealous application of the {Contracts::Returns}
+    # type.  The constraint should always be the last element of the contract,
+    # and should never be nested under a data structure.
+    # @param args [Array[#===|Array|Hash]] the constraints to validate
+    # @return [void]
+    def find_overzealous_returns(args)
+      not_a_constraint = proc do |v|
+        raise MalformedContractError.new self,
+          "`Returns` is not a constraint; " +
+          "please supply a parameter (e.g. `Returns[String]`)"
+      end
+      invalid_value = proc do |v|
+        raise MalformedContractError.new self,
+          "`#{v.inspect}` cannot be used as a value; " +
+          "it must be the last value of the Contract"
+      end
+
+      args.each do |arg|
+        not_a_constraint[arg] if arg == Encase::Contracts::Returns
+
+        case arg
+        when Encase::Contracts::Returns
+          invalid_value[arg]
+        when Array
+          find_overzealous_returns(arg)
+        when Hash
+          arg.values.each do |v|
+            not_a_constraint[v] if v == Encase::Contracts::Returns
+
+            case v
+            when Array
+              find_overzealous_returns(v)
+            when Encase::Contracts::Returns
+              invalid_value[v]
+            end
+          end
+        end
+      end
+    end
+
+    # Handle discovery of overzealous application of the {Contracts::Splat}
+    # type.  In particular there's no good way to resolve a list with more
+    # than one splat; in an effort to discourage ambiguous contracts, we'll
+    # fail if we see two {Contracts::Splat}s in a single list.
     # @param args [Array[#===|Array|Hash]] the constraints to validate
     # @return [void]
     def find_overzealous_splats(args)
       seen_splats = 0
       args.each do |arg|
         if arg == Encase::Contracts::Splat
-           raise MalformedContractError.new self,
-             "`Splat` is not a constraint; " +
-             "please supply a parameter (e.g. `Splat[String]`)"
+          raise MalformedContractError.new self,
+            "`Splat` is not a constraint; " +
+            "please supply a parameter (e.g. `Splat[String]`)"
         end
 
         case arg
+        when Encase::Contracts::Splat
+          if (seen_splats += 1) > 1
+            raise MalformedContractError.new self,
+              "Only one `Splat` can be used in each list in a contract"
+          end
         when Array
           find_overzealous_splats(arg)
         when Hash
@@ -191,11 +229,6 @@ module Encase
                 "`Splat` cannot be used as a Hash value; " +
                 "try wrapping it in an array first (e.g. `[Splat[String]]`)"
             end
-          end
-        when Encase::Contracts::Splat
-          if (seen_splats += 1) > 1
-            raise MalformedContractError.new self,
-              "Only one `Splat` can be used in each list in a contract"
           end
         end
       end
