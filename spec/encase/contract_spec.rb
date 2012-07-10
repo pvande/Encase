@@ -66,11 +66,10 @@ describe Encase::Contract do
     end
 
     it 'should invoke the success callback for each successful validation' do
-      contract.location = loc = double
       data = [
-        { :constraint => Fixnum, :value => 1,   :loc => loc },
-        { :constraint => (1..2), :value => 2,   :loc => loc },
-        { :constraint => /\d/,   :value => '3', :loc => loc },
+        { :constraint => Fixnum, :value => 1   },
+        { :constraint => (1..2), :value => 2   },
+        { :constraint => /\d/,   :value => '3' },
       ]
 
       data.each do |x|
@@ -82,11 +81,10 @@ describe Encase::Contract do
     end
 
     it 'should invoke the failure callback for each unsuccessful validation' do
-      contract.location = loc = double
       data = [
-        { :constraint => Fixnum, :value => :a, :loc => loc },
-        { :constraint => (1..2), :value => :b, :loc => loc },
-        { :constraint => /\d/,   :value => :c, :loc => loc },
+        { :constraint => Fixnum, :value => :a },
+        { :constraint => (1..2), :value => :b },
+        { :constraint => /\d/,   :value => :c },
       ]
 
       data.each do |x|
@@ -100,11 +98,10 @@ describe Encase::Contract do
     it 'should invoke the success callback for each successful array value' do
       contract.location = loc = double
       constraint = [ Fixnum, (1..2), /\d/ ]
-      hash = { :constraint => constraint, :loc => loc }
 
       value = [1, 2, '1']
       (constraint.zip(value) << [constraint, value]).each do |const, val|
-        val = hash_including(hash.merge(:constraint => const, :value => val))
+        val = hash_including(:constraint => const, :value => val)
         contract.should_receive(:success).with(val).and_return(true)
       end
       subject [constraint], [value]
@@ -113,7 +110,7 @@ describe Encase::Contract do
     it 'should invoke the failure callback for unsuccessful array values' do
       contract.location = loc = double
       constraint = [ Fixnum, (1..2), /\d/ ]
-      hash = { :constraint => constraint, :loc => loc }
+      hash = { :constraint => constraint }
 
       val = hash_including(hash.merge(:value => :x))
       contract.should_receive(:failure).with(val).and_return(true)
@@ -138,12 +135,11 @@ describe Encase::Contract do
     it 'should invoke the success callback for successful hash values' do
       contract.location = loc = double
       constraint = { :a => Fixnum, :b => (1..2), :c => /\d/ }
-      hash = { :constraint => constraint, :loc => loc }
 
       data = [
-        { :constraint => Fixnum, :value => 1,   :loc => loc },
-        { :constraint => (1..2), :value => 2,   :loc => loc },
-        { :constraint => /\d/,   :value => '3', :loc => loc },
+        { :constraint => Fixnum, :value => 1   },
+        { :constraint => (1..2), :value => 2   },
+        { :constraint => /\d/,   :value => '3' },
       ]
       
       data.each do |x|
@@ -157,7 +153,7 @@ describe Encase::Contract do
     it 'should invoke the failure callback for unsuccessful hash values' do
       contract.location = loc = double
       constraint = { :a => Fixnum, :b => (1..2), :c => /\d/ }
-      hash = { :constraint => constraint, :loc => loc }
+      hash = { :constraint => constraint }
 
       val = hash_including(hash.merge(:value => :x))
       contract.should_receive(:failure).with(val).and_return(false)
@@ -165,9 +161,9 @@ describe Encase::Contract do
       subject [constraint], [:x]
 
       data = [
-        { :constraint => Fixnum, :value => :a,  :loc => loc },
-        { :constraint => (1..2), :value => :b,  :loc => loc },
-        { :constraint => /\d/,   :value => nil, :loc => loc },
+        { :constraint => Fixnum, :value => :a  },
+        { :constraint => (1..2), :value => :b  },
+        { :constraint => /\d/,   :value => nil },
       ]
       
       data.each do |x|

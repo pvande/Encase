@@ -74,7 +74,7 @@ module Encase
     # @param data [Hash] information about the successful comparison
     # @return [Boolean] always raises exception
     def failure(data)
-      raise ContractViolationException.new(self, data)
+      raise ContractViolationException.new(self, data.merge(:loc => location))
     end
 
     private
@@ -113,34 +113,27 @@ module Encase
     # values of the `args` list.  That approach works fine for simple lists,
     # but we also try to do basic destructuring as well, recursively
     # validating Arrays and Hashes.
-    # @param constraints [Array[#===|Array|Hash]] the set of constraints for
+    # @param consts [Array[#===|Array|Hash]] the set of constraints for
     #        parameter validation
     # @param args [Array] the set of values for parameter validation
     # @return [Boolean] the result of the validation
-    def validate(constraints, args)
-      wrong_argument_count = { :constraint => constraints,
-                               :value => args,
-                               :loc => location }
-
-      constraints, args = constraints.dup, args.dup
+    def validate(consts, args)
+      constraints, arguments = consts.dup, args.dup
 
       while true
-        if args.empty?
-          valid_types = [ [], [Encase::Contracts::Splat] ]
-          return true if valid_types.include? constraints.map(&:class)
-        else
-          return failure(wrong_argument_count) if constraints.empty?
+        if arguments.empty?
+          return true if constraints.empty?
+          return true if constraints.map(&:class) == [Encase::Contracts::Splat]
+        elsif constraints.empty?
+          return failure(:constraint => consts, :value => args)
         end
 
-        if constraints[0].is_a?(Encase::Contracts::Splat)
-          if constraints.size < args.size
-            constraints.unshift(constraints[0])
-          elsif constraints.size > args.size
-            constraints.shift
-          end
-        end
+        const, arg = constraints.shift, arguments.shift
 
-        const, arg = constraints.shift, args.shift
+        if const.is_a?(Encase::Contracts::Splat)
+          constraints.unshift(const)      if constraints.size < arguments.size
+          arguments.unshift(arg) and next if constraints.size > arguments.size
+        end
 
         result = if const.is_a? Array
           validate(const, arg) if arg.is_a?(Array)
@@ -151,7 +144,7 @@ module Encase
           const.is_a?(Proc) ? const[arg] : const === arg
         end
 
-        data = { :constraint => const, :value => arg, :loc => location }
+        data = { :constraint => const, :value => arg }
         return false unless (result ? success(data) : failure(data))
       end
     end
