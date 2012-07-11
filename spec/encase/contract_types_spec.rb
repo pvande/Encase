@@ -15,6 +15,24 @@ describe Encase::Contracts::Any do
     [ 1, :two, 'three', proc { :four }, nil, Object.new, Class ].each do |val|
       contract.send(:around, proc { }, [val], nil)
     end
+
+    contract = contract(nil, Any)
+    contract.should_receive(:failure).exactly(0).times
+    [ 1, :two, 'three', proc { :four }, nil, Object.new, Class ].each do |val|
+      contract.send(:around, proc { }, [nil, val], nil)
+    end
+
+    contract = contract(nil, [Any])
+    contract.should_receive(:failure).exactly(0).times
+    [ 1, :two, 'three', proc { :four }, nil, Object.new, Class ].each do |val|
+      contract.send(:around, proc { }, [nil, [val]], nil)
+    end
+  end
+
+  it 'should fail to validate the lack of any value' do
+    contract = contract(Any)
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [], nil)
   end
 
   it 'should self-describe' do

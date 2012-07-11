@@ -170,6 +170,7 @@ module Encase
         if arguments.empty?
           return true if constraints.empty?
           return true if constraints.map(&:class) == [Encase::Contracts::Splat]
+          return failure(:constraint => consts, :value => args)
         elsif constraints.empty?
           return failure(:constraint => consts, :value => args)
         end
