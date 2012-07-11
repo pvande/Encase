@@ -1,3 +1,4 @@
+require 'spec_helper'
 require 'encase/contract'
 
 describe Encase::Contract do
@@ -192,6 +193,19 @@ describe Encase::Contract do
       contract.should_receive(:validate).with([x, y], [3, 2]).and_return(true)
       contract.should_receive(:validate).with([output], [7])
       subject(3, 2)
+    end
+  end
+
+  describe '#inspect' do
+    def Contract(*args)
+      "#{Encase::Contract.new(*args).send(:inspect)}"
+    end
+
+    it 'should attempt to describe the constraint readably' do
+      Contract().should == "Contract()"
+      Contract(Fixnum, Fixnum).should == "Contract Fixnum, Fixnum"
+      Contract(Fixnum, Returns[String]).should == "Contract Fixnum => String"
+      Contract(Returns[String]).should == "Contract Returns[String]"
     end
   end
 end

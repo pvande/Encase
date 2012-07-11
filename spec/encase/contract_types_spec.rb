@@ -1,3 +1,4 @@
+require 'spec_helper'
 require 'encase/contracts'
 
 describe "Type Constraints" do
@@ -279,6 +280,16 @@ describe Encase::Contracts::Returns do
     contract = contract(1, :two, 'three', Returns[String])
     contract.should_receive(:failure).with(hash_including :value => :symbolic)
     contract.send(:around, proc { :symbolic }, [1, :two, 'three'], nil)
+  end
+
+  it 'should validate even when used incorrectly' do
+    contract = contract(Symbol => Returns[String])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { "stringy" }, [:two], nil)
+
+    contract = contract(Symbol, Returns[Returns[String]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { "stringy" }, [:two], nil)
   end
 
   it 'should raise an exception when not the final constraint' do

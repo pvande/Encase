@@ -83,6 +83,25 @@ module Encase
       raise ContractViolationException.new(self, data.merge(:loc => location))
     end
 
+     # @implicit
+     # Generates a readable string representation of the Contract.
+     # @return [String] a description of this Contract
+     def to_s
+       sig = "Contract "
+       if constraints.has_key?(:args) && !constraints[:args].empty?
+         sig += constraints[:args].map(&:inspect).join(', ')
+         if constraints.has_key? :return
+           sig += " => " + constraints[:return].inspect
+         end
+       elsif constraints.has_key? :return
+         sig += "Returns[#{constraints[:return].inspect}]"
+       else
+         sig = "Contract()"
+       end
+       return sig
+    end
+    alias_method :inspect, :to_s
+
     private
 
     # @!group Decorator Overrides
@@ -241,22 +260,6 @@ module Encase
         end
       end
     end
-
-    # @implicit
-    # Generates a readable string representation of the Contract.
-    # @return [String] a description of this Contract
-    def to_s
-      sig = "Contract "
-      if constraints.has_key? :args
-        sig += constraints[:args].map(&:inspect).join(', ')
-        sig += " => "
-        sig += constraints[:return].inspect if constraints.has_key? :return
-      elsif constraints.has_key? :return
-        sig += "Return[#{constraints[:return].inspect}]"
-      else
-        sig = "Contract()"
-      end
-   end
 
     # Raised by the default implementation of {Contract#failure}, this
     # exception represents an attempt to improperly invoke a function with an
