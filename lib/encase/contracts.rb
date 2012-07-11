@@ -34,13 +34,19 @@ require 'encase/contract'
 #       end
 #     end
 #
-#     Contract Wacky(3..9000) => Wacky(0...1)
+#     Contract Wacky.new(3..9000) => Wacky.new(0...1)
 #     def dewackify(object)
 #       object.wackiness.times { object.calm_down }
 #     end
 #
 # For convenience, there are also a number of meta-typeclasses included in
 # this library.
+#
+# Abstract Type Constraints
+# =========================
+#
+# * <h2>`Any`</h2>
+# {include:Contracts::Any}
 #
 # Type Constraints
 # ================
@@ -58,6 +64,29 @@ require 'encase/contract'
 # * <h2>`Returns[<Type>]`</h2>
 # {include:Contracts::Returns}
 module Encase::Contracts
+
+  # The {Any} type is used to validate only the presence of an argument.
+  #
+  #     Contract Any, Any => Any
+  #     def munge(a, b)
+  #       a.class.new(b)
+  #     end
+  class Any
+
+    # Validate that the argument is either a Proc or a Method.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def self.===(obj)
+      true
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+  end
 
   # The {Code} type represents a first-class executable value, usually a Proc
   # or a bound Method.  More than just a union type, this type will also allow

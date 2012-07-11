@@ -1,6 +1,28 @@
 require 'spec_helper'
 require 'encase/contracts'
 
+describe "Abstract Type Constraints" do
+describe Encase::Contracts::Any do
+  Any = Encase::Contracts::Any
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  it 'should validate any value' do
+    contract = contract(Any)
+    contract.should_receive(:failure).exactly(0).times
+    [ 1, :two, 'three', proc { :four }, nil, Object.new, Class ].each do |val|
+      contract.send(:around, proc { }, [val], nil)
+    end
+  end
+
+  it 'should self-describe' do
+    "#{Any}".should == 'Any'
+  end
+end
+end
+
 describe "Type Constraints" do
 describe Encase::Contracts::Code do
   Code = Encase::Contracts::Code
