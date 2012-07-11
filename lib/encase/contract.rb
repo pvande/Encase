@@ -168,9 +168,9 @@ module Encase
 
       while true
         if arguments.empty?
-          return true if constraints.empty?
-          return true if constraints.map(&:class) == [Encase::Contracts::Splat]
-          return failure(:constraint => consts, :value => args)
+          return constraints.all? { |c| c == Encase::Contracts::None } ||
+                 constraints.map(&:class) == [Encase::Contracts::Splat] ||
+                 failure(:constraint => consts, :value => args)
         elsif constraints.empty?
           return failure(:constraint => consts, :value => args)
         end

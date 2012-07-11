@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'encase/contracts'
 
-describe "Abstract Type Constraints" do
+describe "[Abstract Type Constraints]" do
 describe Encase::Contracts::Any do
   Any = Encase::Contracts::Any
 
@@ -39,9 +39,43 @@ describe Encase::Contracts::Any do
     "#{Any}".should == 'Any'
   end
 end
+
+describe Encase::Contracts::None do
+  None = Encase::Contracts::None
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  it 'should refuse to validate any value' do
+    contract = contract(None)
+    contract.should_receive(:failure).exactly(7).times
+    [ 1, :two, 'three', proc { :four }, nil, Object.new, Class ].each do |val|
+      contract.send(:around, proc { }, [val], nil)
+    end
+  end
+
+  it 'should validate the lack of any value' do
+    contract = contract(None)
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [], nil)
+
+    contract = contract(Fixnum, None)
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+
+    contract = contract(Fixnum, [None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1, []], nil)
+  end
+
+  it 'should self-describe' do
+    "#{None}".should == 'None'
+  end
+end
 end
 
-describe "Type Constraints" do
+describe "[Type Constraints]" do
 describe Encase::Contracts::Code do
   Code = Encase::Contracts::Code
 
@@ -130,7 +164,7 @@ describe Encase::Contracts::Code do
 end
 end
 
-describe "Signature Constraints" do
+describe "[Signature Constraints]" do
 describe Encase::Contracts::Splat do
   Splat = Encase::Contracts::Splat
 

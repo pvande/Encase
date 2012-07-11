@@ -47,6 +47,8 @@ require 'encase/contract'
 #
 # * <h2>`Any`</h2>
 # {include:Contracts::Any}
+# * <h2>`None`</h2>
+# {include:Contracts::None}
 #
 # Type Constraints
 # ================
@@ -78,6 +80,36 @@ module Encase::Contracts
     # @return [Boolean] the result of the validation
     def self.===(obj)
       true
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+  end
+
+  # The {None} type is used to validate the non-presence of an argument.  Note
+  # that this is *not* the same thing as validating the nullness of an
+  # argument; for that, use `nil` as your constraint.
+  #
+  #     Contract None => String
+  #     def to_s
+  #       self.inspect
+  #     end
+  #
+  #     Contract [None]
+  #     def fill_empty_array(array)
+  #       array << 1 << 2 << 3
+  #     end
+  class None
+
+    # Validate that the argument is either a Proc or a Method.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def self.===(obj)
+      false
     end
 
     # @implicit
