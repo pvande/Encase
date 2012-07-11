@@ -45,14 +45,20 @@ module Encase
         self.constraints = { :args => args }
       end
 
+      # If we were invoked with only a {Contracts::Returns} constraint, we
+      # should avoid trying to validate any of the parameters.
+      if args.last.is_a?(Encase::Contracts::Returns) && args.size == 1
+        constraints.delete :args
+      end
+
       # Check for superfluous {Returns}
-      find_overzealous_returns(constraints[:args])
+      find_overzealous_returns constraints[:args] if constraints.has_key? :args
       if constraints[:return] == Encase::Contracts::Returns
         find_overzealous_returns([constraints[:return]])
       end
 
       # Check for superfluous {Splat}
-      find_overzealous_splats(constraints[:args])
+      find_overzealous_splats constraints[:args] if constraints.has_key? :args
     end
 
     # @!group Contract Validation Callbacks
@@ -91,7 +97,9 @@ module Encase
     # @see #failure
     # @see Decorator#around
     def around(code, args, block)
-      return unless validate(constraints[:args], args)
+      if constraints.has_key?(:args)
+        return unless validate(constraints[:args], args)
+      end
       code.call(*args, &block).tap do |retval|
         if constraints.has_key?(:return)
           return unless validate([constraints[:return]], [retval])
@@ -141,7 +149,14 @@ module Encase
           validate(*const.keys.map { |k| [const[k], arg[k]] }.transpose)
         else
           # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
-          const.is_a?(Proc) ? const[arg] : const === arg
+          (const.is_a?(Proc) ? const[arg] : const === arg).tap do
+            # Speaking of magic, we want to make sure that any code we're
+            # decorating actually checks its types.  To make that happen,
+            # we'll just do a little slight-of-hand on the `args` list here…
+            if const.is_a?(Encase::Contracts::Code)
+              args[args.length - arguments.length - 1] = const.wrap(arg)
+            end
+          end
         end
 
         data = { :constraint => const, :value => arg }
@@ -227,6 +242,22 @@ module Encase
       end
     end
 
+    # @implicit
+    # Generates a readable string representation of the Contract.
+    # @return [String] a description of this Contract
+    def to_s
+      sig = "Contract "
+      if constraints.has_key? :args
+        sig += constraints[:args].map(&:inspect).join(', ')
+        sig += " => "
+        sig += constraints[:return].inspect if constraints.has_key? :return
+      elsif constraints.has_key? :return
+        sig += "Return[#{constraints[:return].inspect}]"
+      else
+        sig = "Contract()"
+      end
+   end
+
     # Raised by the default implementation of {Contract#failure}, this
     # exception represents an attempt to improperly invoke a function with an
     # explicit type constraint.
@@ -238,7 +269,6 @@ module Encase
         klass       = contract.decorated_class
         method      = contract.decorated_method
         location    = contract.location
-        constraints = contract.constraints
 
         msg = "\nContract Violation for "
         msg += if klass.ancestors.include?(Class)
@@ -247,8 +277,7 @@ module Encase
           "#{klass}##{method}:"
         end
         msg += "\n(declared in #{location})"
-        msg += "\n  Contract #{constraints[:args].map(&:inspect).join(', ')}"
-        msg += " => #{constraints[:return]}" if constraints.has_key? :return
+        msg += "\n  #{contract}"
         msg += "\n  Expected #{data[:constraint].inspect}"
         msg += "\n  Received #{data[:value].inspect}"
 
@@ -264,11 +293,8 @@ module Encase
     #   * {Contracts::Returns} itself used as a constraint
     class MalformedContractError < StandardError
       def initialize(contract, message)
-        constraints = contract.constraints
-
         msg = "\nMalformed Contract for"
-        msg += "\n  Contract #{constraints[:args].map(&:inspect).join(', ')}"
-        msg += " => #{constraints[:return]}" if constraints.has_key? :return
+        msg += "\n  #{contract}"
         msg += "\n  #{message}"
         
         super msg

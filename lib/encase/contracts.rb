@@ -42,6 +42,12 @@ require 'encase/contract'
 # For convenience, there are also a number of meta-typeclasses included in
 # this library.
 #
+# Type Constraints
+# ================
+#
+# * <h2>`Code`</h2>
+# {include:Contracts::Code}
+#
 # Signature Constraints
 # =====================
 #
@@ -50,6 +56,62 @@ require 'encase/contract'
 # * <h2>`Returns[<Type>]`</h2>
 # {include:Contracts::Returns}
 module Encase::Contracts
+
+  # The {Code} type represents a first-class executable value, usually a Proc
+  # or a bound Method.  More than just a union type, this type will also allow
+  # you to describe the expected input and output types of the value, which
+  # will be validated when the code is executed.
+  #
+  #     Contract Symbol => Code
+  #     def get_method(name)
+  #       self.class.method(name)
+  #     end
+  #
+  #     Contract Code[Object => Fixnum] => Fixnum
+  #     def mapping(code)
+  #       code.call(self)
+  #     end
+  class Code
+
+    # Creates a new {Code} constraint describing the expected types of the
+    # arguments and return value of the constrained code.
+    # @param types [Array[#===|Array|Hash]] the contract constraints to apply
+    #        to the code's arguments and return value
+    # @return [Code<*types>] a constraint that applies a Contract to the
+    #         constrained code value
+    def self.[](*types)
+      self.new(*types)
+    end
+
+    # (see #===)
+    # This behaves as if it were an instance created with no arguments.
+    def self.===(obj)
+      self.new === obj
+    end
+
+    # @implicit
+    def initialize(*types)
+      @types = types
+      @contract = Encase::Contract.new(*@types)
+      @splatted = types.any? { |t| t.is_a? Splat }
+      @arity = types.count { |t| not t.is_a? Splat }
+    end
+
+    # Validate that the argument is either a Proc or a Method.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      obj.is_a?(Proc) || obj.is_a?(Method)
+    end
+
+    # Passes the callable through to the underlying {Contract} to be wrapped
+    # in validation behaviors.
+    # @param (see Decorator#wrap_callable)
+    # @return (see Decorator#wrap_callable)
+    def wrap(callable)
+      @contract.wrap_callable(callable)
+    end
+  end
 
   # A {Splat} stands in for zero or more positional arguments, just as the
   # Ruby `*args` construct does, allowing you to write constraints for
@@ -60,8 +122,9 @@ module Encase::Contracts
   #       numbers.inject { |a,b| a + b }
   #     end
   class Splat
-    # Creates a new constraint for describing the type of the value returned
-    # from the Contracted code.
+
+    # Creates a new constraint for describing the type of zero or more
+    # arguments in a list.
     # @param type [#===|Array|Hash] the constraint to apply to the arguments
     # @return [Splat<type>] a constraint that validates zero or more arguments
     def self.[](type)
@@ -73,8 +136,8 @@ module Encase::Contracts
       @type = type
     end
 
-    # Validate that an arguments conforms to the given interface.
-    # @param val [#===|Array|Hash] the value to validate
+    # Validate that the argument conforms to the given interface.
+    # @param val [Object] the value to validate
     # @return [Boolean] the result of the validation
     def ===(val)
       @type === val
@@ -125,10 +188,11 @@ module Encase::Contracts
   #
   # This constraint type is only useful as the last argument to `Contract`.
   class Returns < Hash
+
     # Creates a new constraint for describing the type of the value returned
-    # from the Contracted code.
+    # from the constrained code.
     # @param type [#===|Array|Hash] the constraint for the return value
-    # @return [Returns<type>] a constraint that only validates the return value
+    # @return [Returns<type>] a constraint that validates the return value
     def self.[](type)
       super(nil, type)
     end

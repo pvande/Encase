@@ -1,8 +1,76 @@
 require 'encase/contracts'
 
-describe Encase::Contracts::Splat do
-  OLD_RUBY = RUBY_VERSION =~ /^1\.8\./
+describe "Type Constraints" do
+describe Encase::Contracts::Code do
+  Code = Encase::Contracts::Code
 
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  describe 'without parameters' do
+    it 'should validate that the value is a Proc or Method' do
+      contract = contract(Code)
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc {}, [proc { }], nil)
+
+      contract = contract(Code)
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc {}, [self.method(:example)], nil)
+
+      contract = contract(Code)
+      contract.should_receive(:failure).exactly(1).times
+      contract.send(:around, proc {}, [:symbol], nil)
+    end
+  end
+
+  describe 'with parameters' do
+    it 'should validate that the value is a Proc or Method' do
+      contract = contract(Code[])
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc {}, [proc { }], nil)
+
+      contract = contract(Code[])
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc {}, [self.method(:example)], nil)
+
+      contract = contract(Code[])
+      contract.should_receive(:failure).exactly(1).times
+      contract.send(:around, proc {}, [:symbol], nil)
+    end
+
+    it 'should validate parameter constraints when the code is called' do
+      contract = contract(Code[Fixnum])
+      failures = 0
+      Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+      callable = contract.wrap_callable(proc { |x| x[1] })
+      callable[lambda { |y| y * 3 }].should == 3
+      failures.should == 0
+
+      callable = contract.wrap_callable(proc { |x| x['1'] })
+      callable[lambda { |y| y * 3 }].should == '111'
+      failures.should == 1
+    end
+
+    it 'should validate return value constraints when the code is called' do
+      contract = contract(Code[Returns[Fixnum]])
+      failures = 0
+      Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+      callable = contract.wrap_callable(proc { |x| x[1] })
+      callable[lambda { |y| y * 3 }].should == 3
+      failures.should == 0
+
+      callable[lambda { |y| y.to_s }].should == '1'
+      failures.should == 1
+    end
+  end
+end
+end
+
+describe "Signature Constraints" do
+describe Encase::Contracts::Splat do
   Splat = Encase::Contracts::Splat
 
   def contract(*args)
@@ -197,6 +265,10 @@ describe Encase::Contracts::Returns do
     contract = contract(Returns[String])
     contract.should_receive(:failure).with(hash_including :value => :symbolic)
     contract.send(:around, proc { :symbolic }, [], nil)
+
+    contract = contract(Returns[String])
+    contract.should_receive(:failure).with(hash_including :value => :symbolic)
+    contract.send(:around, proc { :symbolic }, [1], nil)
   end
 
   it 'should validate even when preceded by other arguments' do
@@ -266,4 +338,5 @@ describe Encase::Contracts::Returns do
       contract(Returns[Returns])
     end.to raise_exception(Encase::Contract::MalformedContractError)
   end
+end
 end
