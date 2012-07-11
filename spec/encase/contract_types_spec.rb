@@ -13,15 +13,23 @@ describe Encase::Contracts::Code do
     it 'should validate that the value is a Proc or Method' do
       contract = contract(Code)
       contract.should_receive(:failure).exactly(0).times
-      contract.send(:around, proc {}, [proc { }], nil)
+      contract.send(:around, proc { }, [proc { }], nil)
 
       contract = contract(Code)
       contract.should_receive(:failure).exactly(0).times
-      contract.send(:around, proc {}, [self.method(:example)], nil)
+      contract.send(:around, proc { }, [self.method(:example)], nil)
+
+      contract = contract(Code, Code)
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc { }, [proc { }, proc { }], nil)
 
       contract = contract(Code)
       contract.should_receive(:failure).exactly(1).times
-      contract.send(:around, proc {}, [:symbol], nil)
+      contract.send(:around, proc { }, [:symbol], nil)
+    end
+
+    it 'should self-describe' do
+      "#{Code}".should == 'Code'
     end
   end
 
@@ -29,15 +37,19 @@ describe Encase::Contracts::Code do
     it 'should validate that the value is a Proc or Method' do
       contract = contract(Code[])
       contract.should_receive(:failure).exactly(0).times
-      contract.send(:around, proc {}, [proc { }], nil)
+      contract.send(:around, proc { }, [proc { }], nil)
 
       contract = contract(Code[])
       contract.should_receive(:failure).exactly(0).times
-      contract.send(:around, proc {}, [self.method(:example)], nil)
+      contract.send(:around, proc { }, [self.method(:example)], nil)
+
+      contract = contract(Code[], Code[])
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc { }, [proc { }, proc { }], nil)
 
       contract = contract(Code[])
       contract.should_receive(:failure).exactly(1).times
-      contract.send(:around, proc {}, [:symbol], nil)
+      contract.send(:around, proc { }, [:symbol], nil)
     end
 
     it 'should validate parameter constraints when the code is called' do
@@ -65,6 +77,14 @@ describe Encase::Contracts::Code do
 
       callable[lambda { |y| y.to_s }].should == '1'
       failures.should == 1
+    end
+
+    it 'should self-describe' do
+      "#{Code[]}".should == 'Code[]'
+      "#{Code[Fixnum]}".should == 'Code[Fixnum]'
+      "#{Code[Fixnum => Fixnum]}".should == 'Code[Fixnum => Fixnum]'
+      "#{Code[Fixnum, Returns[Fixnum]]}".should == 'Code[Fixnum => Fixnum]'
+      "#{Code[Returns[String]]}".should == 'Code[Returns[String]]'
     end
   end
 end
@@ -106,7 +126,7 @@ describe Encase::Contracts::Splat do
       arguments.each do |args|
         contract = contract(*constraints)
         contract.should_receive(:failure).exactly(0).times
-        contract.send(:around, proc {}, [*args], nil)
+        contract.send(:around, proc { }, [*args], nil)
       end
     end
 
@@ -114,7 +134,7 @@ describe Encase::Contracts::Splat do
       arguments.each do |args|
         contract = contract(constraints)
         contract.should_receive(:failure).exactly(0).times
-        contract.send(:around, proc {}, [args], nil)
+        contract.send(:around, proc { }, [args], nil)
       end
     end
 
@@ -122,7 +142,7 @@ describe Encase::Contracts::Splat do
       arguments.each do |args|
         contract = contract(:a => 1, :b => constraints)
         contract.should_receive(:failure).exactly(0).times
-        contract.send(:around, proc {}, [{ :a => 1, :b => args }], nil)
+        contract.send(:around, proc { }, [{ :a => 1, :b => args }], nil)
       end
     end
   end
@@ -165,7 +185,7 @@ describe Encase::Contracts::Splat do
         failures.each do |f|
           contract.should_receive(:failure).with(hash_including(f)) { true }
         end
-        contract.send(:around, proc {}, [*args], nil)
+        contract.send(:around, proc { }, [*args], nil)
       end
     end
 
@@ -175,7 +195,7 @@ describe Encase::Contracts::Splat do
         failures.each do |f|
           contract.should_receive(:failure).with(hash_including(f)) { true }
         end
-        contract.send(:around, proc {}, [args], nil)
+        contract.send(:around, proc { }, [args], nil)
       end
     end
 
@@ -185,7 +205,7 @@ describe Encase::Contracts::Splat do
         failures.each do |f|
           contract.should_receive(:failure).with(hash_including(f)) { true }
         end
-        contract.send(:around, proc {}, [{ :a => 1, :b => args }], nil)
+        contract.send(:around, proc { }, [{ :a => 1, :b => args }], nil)
       end
     end
   end
@@ -248,6 +268,82 @@ describe Encase::Contracts::Splat do
     expect do
       contract(:a => [Splat], :b => :b)
     end.to raise_exception(Encase::Contract::MalformedContractError)
+  end
+
+  it 'should self-describe' do
+    "#{Splat[Fixnum]}".should == 'Splat[Fixnum]'
+    "#{Splat[Fixnum => Fixnum]}".should == 'Splat[{Fixnum=>Fixnum}]'
+  end
+end
+
+describe Encase::Contracts::Block do
+  Block = Encase::Contracts::Block
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  describe 'without parameters' do
+    it 'should validate that the block exists' do
+      contract = contract(Block)
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc { }, [], proc { })
+
+      contract = contract(Block)
+      contract.should_receive(:failure).exactly(1).times
+      contract.send(:around, proc { }, [], nil)
+    end
+
+    it 'should self-describe' do
+      "#{Block}".should == 'Block'
+    end
+  end
+
+  describe 'with parameters' do
+    it 'should validate that the block is a Proc or Method' do
+      contract = contract(Block[])
+      contract.should_receive(:failure).exactly(0).times
+      contract.send(:around, proc { }, [], proc { })
+
+      contract = contract(Block[])
+      contract.should_receive(:failure).exactly(1).times
+      contract.send(:around, proc { }, [], nil)
+    end
+
+    it 'should validate parameter constraints when the code is called' do
+      contract = contract(Block[Fixnum])
+      failures = 0
+      Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+      callable = contract.wrap_callable(proc { |&x| x[1] })
+      callable.call(&(lambda { |y| y * 3 })).should == 3
+      failures.should == 0
+
+      callable = contract.wrap_callable(proc { |&x| x['1'] })
+      callable.call(&(lambda { |y| y * 3 })).should == '111'
+      failures.should == 1
+    end
+
+    it 'should validate return value constraints when the code is called' do
+      contract = contract(Block[Returns[Fixnum]])
+      failures = 0
+      Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+      callable = contract.wrap_callable(proc { |&x| x[1] })
+      callable.call(&(lambda { |y| y * 3 })).should == 3
+      failures.should == 0
+
+      callable.call(&(lambda { |y| y.to_s })).should == '1'
+      failures.should == 1
+    end
+
+    it 'should self-describe' do
+      "#{Block[]}".should == 'Block[]'
+      "#{Block[Fixnum]}".should == 'Block[Fixnum]'
+      "#{Block[Fixnum => Fixnum]}".should == 'Block[Fixnum => Fixnum]'
+      "#{Block[Fixnum, Returns[Fixnum]]}".should == 'Block[Fixnum => Fixnum]'
+      "#{Block[Returns[String]]}".should == 'Block[Returns[String]]'
+    end
   end
 end
 
@@ -348,6 +444,12 @@ describe Encase::Contracts::Returns do
     expect do
       contract(Returns[Returns])
     end.to raise_exception(Encase::Contract::MalformedContractError)
+  end
+
+  it 'should self-describe' do
+    "#{Returns[Fixnum]}".should == 'Returns[Fixnum]'
+    "#{Returns[Fixnum => Fixnum]}".should == 'Returns[{Fixnum=>Fixnum}]'
+    "#{Returns[Returns[String]]}".should == 'Returns[Returns[String]]'
   end
 end
 end

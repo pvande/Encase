@@ -45,6 +45,12 @@ module Encase
         self.constraints = { :args => args }
       end
 
+      if constraints[:args].last.is_a?(Encase::Contracts::Block) ||
+         constraints[:args].last == Encase::Contracts::Block
+        constraints[:block] = constraints[:args].shift
+        constraints.delete :args if constraints[:args].empty?
+      end
+
       # If we were invoked with only a {Contracts::Returns} constraint, we
       # should avoid trying to validate any of the parameters.
       if args.last.is_a?(Encase::Contracts::Returns) && args.size == 1
@@ -116,14 +122,27 @@ module Encase
     # @see #failure
     # @see Decorator#around
     def around(code, args, block)
+      # We begin by validating our arguments, returning if validation fails.
       if constraints.has_key?(:args)
         return unless validate(constraints[:args], args)
       end
-      code.call(*args, &block).tap do |retval|
-        if constraints.has_key?(:return)
-          return unless validate([constraints[:return]], [retval])
-        end
+
+      # Next, we validate the type of our block argument, if we have a
+      # constraint describing it.  Because the constraint will wrap the block
+      # with additional validations, we munge the reference appropriately.
+      if constraints.has_key?(:block)
+        return unless validate([constraints[:block]], block = [block])
+        block = block.shift
       end
+
+      # Finally, we call the code itself passing the arguments and the block,
+      # and run validations against the return value.
+      retval = [ code.call(*args, &block) ]
+      if constraints.has_key?(:return)
+        return unless validate([constraints[:return]], retval)
+      end
+
+      return retval.shift
     end
 
     # These methods are obsoleted by this subclass.

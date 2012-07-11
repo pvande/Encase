@@ -53,6 +53,8 @@ require 'encase/contract'
 #
 # * <h2>`Splat[<Type>]`</h2>
 # {include:Contracts::Splat}
+# * <h2>`Block`</h2>
+# {include:Contracts::Block}
 # * <h2>`Returns[<Type>]`</h2>
 # {include:Contracts::Returns}
 module Encase::Contracts
@@ -111,6 +113,21 @@ module Encase::Contracts
     def wrap(callable)
       @contract.wrap_callable(callable)
     end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@contract.to_s.sub(/^Contract( |\(\))/, '')}]"
+    end
+    alias_method :inspect, :to_s
   end
 
   # A {Splat} stands in for zero or more positional arguments, just as the
@@ -145,7 +162,29 @@ module Encase::Contracts
 
     # @implicit
     # Provide a recognizable string representation.
-    def inspect; "Splat[#{@type.inspect}]"; end
+    def to_s; "Splat[#{@type.inspect}]"; end
+    alias_method :inspect, :to_s
+  end
+
+  # The {Block} constraint functions very much like the {Code} constraint, in
+  # that it describes a contract for an executable value.  The distinction is
+  # that this type is used specifically to validate the code passed to the
+  # {http://bit.ly/P0Rxrw block slot} of the method.
+  #
+  # This type (like the {Returns} type) is handled specially; you may have
+  # only one {Block} in each {Contract}, and it should be the last value
+  # before any {Returns}.
+  #
+  #     Contract Array, Block[Object => Fixnum]
+  #     def int_map(array, &block)
+  #       array.map(&block)
+  #     end
+  #
+  #     Contract Array, Block[Object => String] => String
+  #     def stringify(array, &block)
+  #       array.map(&block).join
+  #     end
+  class Block < Code
   end
 
   # This constraint allows you to write a contract for the return value of the
@@ -210,7 +249,8 @@ module Encase::Contracts
 
     # @implicit
     # Provide a recognizable string representation.
-    def inspect; "Returns#{values.inspect}"; end
+    def to_s; "Returns#{values.inspect}"; end
+    alias_method :inspect, :to_s
   end
 
   # @implicit
