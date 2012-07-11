@@ -1,4 +1,4 @@
-unless ENV['CI']
+unless ENV['CI'] or RUBY_VERSION =~ /^1\.8\./
   require 'simplecov'
   SimpleCov.start do
     add_filter 'spec'
