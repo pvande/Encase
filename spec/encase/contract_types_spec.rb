@@ -443,6 +443,105 @@ describe Encase::Contracts::Code do
 end
 end
 
+describe "[Dynamic Constraints]" do
+describe Encase::Contracts::Test do
+  Test = Encase::Contracts::Test
+
+  it 'should validate all values who return a truthy value for the test' do
+    contract = contract(Test[:empty?])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [[]], nil)
+    contract.send(:around, proc { }, [{}], nil)
+    contract.send(:around, proc { }, [''], nil)
+
+    contract = contract(Test[:zero?])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [0], nil)
+  end
+
+  it 'should refuse all values who return a falsey value for the test' do
+    contract = contract(Test[:empty])
+    contract.should_receive(:failure).exactly(3).times
+    contract.send(:around, proc { }, [[1]], nil)
+    contract.send(:around, proc { }, [{:a => 1}], nil)
+    contract.send(:around, proc { }, ['abc'], nil)
+
+    contract = contract(Test[:zero?])
+    contract.should_receive(:failure).exactly(3).times
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, [nil], nil)
+    contract.send(:around, proc { }, [:symbol], nil)
+  end
+
+  it 'should pass extra arguments along with the message send' do
+    contract = contract(Test[:>, 0])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, [2], nil)
+    contract.send(:around, proc { }, [1 / 0.0], nil)  # Infinity
+
+    contract = contract(Test[:<, 0])
+    contract.should_receive(:failure).exactly(3).times
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, [2], nil)
+    contract.send(:around, proc { }, [1 / 0.0], nil)  # Infinity
+  end
+
+  it 'should self-describe' do
+    "#{Test[:true?]}".should == 'Test[:true?]'
+    "#{Test[:>, 0]}".should == 'Test[:>, 0]'
+  end
+end
+
+describe Encase::Contracts::Can do
+  Can = Encase::Contracts::Can
+
+  it 'should validate all values who respond to the named method' do
+    contract = contract(Can[:each])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [[]], nil)
+    contract.send(:around, proc { }, [{}], nil)
+
+    contract = contract(Can[:zero?])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [0], nil)
+    contract.send(:around, proc { }, [1], nil)
+  end
+
+  it 'should refuse all values who do not respond to the named method' do
+    contract = contract(Can[:die_horribly])
+    contract.should_receive(:failure).exactly(3).times
+    contract.send(:around, proc { }, [[1]], nil)
+    contract.send(:around, proc { }, [{:a => 1}], nil)
+    contract.send(:around, proc { }, ['abc'], nil)
+
+    contract = contract(Can[:zero?])
+    contract.should_receive(:failure).exactly(3).times
+    contract.send(:around, proc { }, [nil], nil)
+    contract.send(:around, proc { }, [:symbol], nil)
+    contract.send(:around, proc { }, [double()], nil)
+  end
+
+  it 'should test all named methods' do
+    contract = contract(Can[:>, :<, :===, :==])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, [2], nil)
+    contract.send(:around, proc { }, [1 / 0.0], nil)  # Infinity
+
+    contract = contract(Can[:>, :<, :===, :==])
+    contract.should_receive(:failure).exactly(2).times
+    contract.send(:around, proc { }, [Class.new.new], nil)
+    contract.send(:around, proc { }, [double()], nil)
+  end
+
+  it 'should self-describe' do
+    "#{Can[:true?]}".should == 'Can[:true?]'
+    "#{Can[:to_proc, :to_s]}".should == 'Can[:to_proc, :to_s]'
+  end
+end
+end
+
 describe "[Signature Constraints]" do
 describe Encase::Contracts::Splat do
   Splat = Encase::Contracts::Splat

@@ -74,6 +74,14 @@ require 'encase/contract'
 # * <h2>`Code`</h2>
 # {include:Contracts::Code}
 #
+# Dynamic Constraints
+# ===================
+#
+# * <h2>`Test`</h2>
+# {include:Contracts::Test}
+# * <h2>`Can`</h2>
+# {include:Contracts::Can}
+#
 # Signature Constraints
 # =====================
 #
@@ -448,6 +456,102 @@ module Encase::Contracts
       "#{self.class}[#{@contract.to_s.sub(/^Contract( |\(\))/, '')}]"
     end
     alias_method :inspect, :to_s
+  end
+
+  # The {Test} type introduces a facility for validating objects by directly
+  # querying the objects themselves.  Particularly useful with predicate
+  # methods, this allows you two quickly write checks and comparisons you
+  # might otherwise write a Proc for.
+  #
+  #     Contract Test[:empty?]
+  #     def append_to_empty_collection(collection)
+  #       collection << 1 << 2 << 3
+  #     end
+  #
+  #     Contract Test[:>=, 0] => Fixnum
+  #     def decrement(n)
+  #       n - 1
+  #     end
+  class Test
+
+    # Creates a new {Test} constraint, which validates values by invoking
+    # methods on the object being tested.
+    # @param method [Symbol] the method to test
+    # @param types [Array[Any]] any additional arguments to send to the method
+    # @return [Test<method, *types>] a constraint that will execute the method
+    #         with the given arguments, expecting a truthy value
+    def self.[](method, *types)
+      self.new(method, *types)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(method, *types)
+      @args = [method, *types]
+    end
+
+    # Validate that the specified method (with the given arguments) returns a
+    # truthy value.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      obj.send(*@args) rescue false
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@args.map(&:inspect).join(', ')}]"
+    end
+    alias_method :inspect, :to_s
+  end
+
+  # The {Can} type is a specialization of {Test}, which specifically tests
+  # whether values `#respond_to?` the named method.  Multiple methods may be
+  # named; all must be supported to validate.
+  #
+  #     Contract Can[:to_s] => String
+  #     def stringify(obj)
+  #       obj.to_s
+  #     end
+  #
+  #     Contract Can[:save, :load] => Bool
+  #     def update(obj)
+  #       obj.load
+  #       obj.updated = DateTime.now
+  #       obj.save
+  #     end
+  class Can < Test
+
+    # Creates a new {Can} constraint, which tests whether objects respond to
+    # the listed methods.
+    # @param methods [Array[Symbol]] a list of methods to test for
+    # @return [Can<*methods>] a constraint that will test whether objects
+    # respond to all listed methods.
+    def self.[](*methods)
+      self.new(*methods)
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(*methods)
+      @args = methods
+    end
+
+    # Validate that the specified object responds to all given messages.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      @args.all? { |m| obj.respond_to?(m) rescue false }
+    end
   end
 
   # A {Splat} stands in for zero or more positional arguments, just as the
