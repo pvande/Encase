@@ -97,6 +97,33 @@ require 'encase/contract'
 # {include:Contracts::Returns}
 module Encase::Contracts
 
+  # @implicit
+  # These modules collect common methods, to reduce duplication.
+  module Shared
+    # @implicit
+    module InstanceMethods
+
+      # @implicit
+      # Generates a readable string representation of the constraint.
+      # @return [String] a description of this constraint
+      def to_s
+        "#{self.class}[#{@args.map(&:inspect).join(', ')}]"
+      end
+      alias_method :inspect, :to_s
+    end
+
+    # @implicit
+    module ClassMethods
+
+      # @implicit
+      # Generates a readable string representation of the constraint.
+      # @return [String] a description of this constraint
+      def to_s
+        name.sub(/.*::/, '')
+      end
+    end
+  end
+
   # The {Any} type is used to validate only the presence of an argument.
   #
   #     Contract Any, Any => Any
@@ -104,19 +131,13 @@ module Encase::Contracts
   #       a.class.new(b)
   #     end
   class Any
+    self.extend Shared::ClassMethods
 
     # Validate that the argument is either a Proc or a Method.
     # @param obj [Object] the value to validate
     # @return [Boolean] the result of the validation
     def self.===(obj)
       true
-    end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
     end
   end
 
@@ -127,24 +148,20 @@ module Encase::Contracts
   #       n.to_s unless n.nil?
   #     end
   class Maybe
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates an uncertain type constraint of the supplied type.
     # @param type [#===] the constraint to negate
-    # @return [Not<type>] a constraint that validates the value, if present
+    # @return [Maybe<type>] a constraint that validates the value, if present
     def self.[](type)
       self.new(type)
     end
 
     # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
-    end
-
-    # @implicit
     # (see [])
     def initialize(type)
+      @args = [type]
       @type = type
     end
 
@@ -161,8 +178,7 @@ module Encase::Contracts
       true
     end
 
-    # @implicit
-    def method_missing(name, *args, &block)
+    self.send(:define_method, :method_missing) do |name, *args, &block|
       @type.send(name, *args, &block)
     end
 
@@ -172,14 +188,6 @@ module Encase::Contracts
     def is_a?(type)
       super or @type.is_a?(type)
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@type.inspect}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # The {None} type is used to validate the non-presence of an argument.  Note
@@ -196,19 +204,13 @@ module Encase::Contracts
   #       array << 1 << 2 << 3
   #     end
   class None
+    self.extend Shared::ClassMethods
 
     # Validate that the argument is either a Proc or a Method.
     # @param obj [Object] the value to validate
     # @return [Boolean] the result of the validation
     def self.===(obj)
       false
-    end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
     end
 
     # Is this an optional parameter?
@@ -226,6 +228,8 @@ module Encase::Contracts
   #       array[n]
   #     end
   class And
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates a type constraint as an intersection of the supplied types.
     # @param a [#===|Array|Hash] the constraints to intersect
@@ -237,16 +241,9 @@ module Encase::Contracts
     end
 
     # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
-    end
-
-    # @implicit
     # (see [])
     def initialize(a, b, *rest)
-      @types = [a, b, *rest]
+      @args = @types = [a, b, *rest]
       class << @contract = Encase::Contract.new
         def success(*); true; end
         def failure(*); false; end
@@ -265,14 +262,6 @@ module Encase::Contracts
     def optional?
       @types.all? { |t| t.optional? rescue false }
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # The {Or} type unions two or more constraints, validating that the
@@ -283,6 +272,8 @@ module Encase::Contracts
   #       a + b
   #     end
   class Or
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates a type constraint as a union of the supplied types.
     # @param a [#===|Array|Hash] the constraints to union
@@ -294,16 +285,9 @@ module Encase::Contracts
     end
 
     # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
-    end
-
-    # @implicit
     # (see [])
     def initialize(a, b, *rest)
-      @types = [a, b, *rest]
+      @args = @types = [a, b, *rest]
       class << @contract = Encase::Contract.new
         def success(*); true; end
         def failure(*); false; end
@@ -322,14 +306,6 @@ module Encase::Contracts
     def optional?
       @types.any? { |t| t.optional? rescue false }
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # The {Xor} type creates a new type that meets exactly one of the given
@@ -340,6 +316,8 @@ module Encase::Contracts
   #       x.length
   #     end
   class Xor
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates a type constraint as an exclusive union of the supplied types.
     # @param a [#===|Array|Hash] the constraints to union
@@ -351,16 +329,9 @@ module Encase::Contracts
     end
 
     # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
-    end
-
-    # @implicit
     # (see [])
     def initialize(a, b, *rest)
-      @types = [a, b, *rest]
+      @args = @types = [a, b, *rest]
       class << @contract = Encase::Contract.new
         def success(*); true; end
         def failure(*); false; end
@@ -379,14 +350,6 @@ module Encase::Contracts
     def optional?
       @types.any? { |t| t.optional? rescue false }
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # The {Not} type inverts the constraint of the given type.
@@ -397,6 +360,9 @@ module Encase::Contracts
   #       x.__id__
   #     end
   class Not
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
+
     # Creates a type constraint as a negation of the supplied type.
     # @param type [#===] the constraint to negate
     # @return [Not<type>] a constraint that validates the inverse constraint
@@ -405,15 +371,9 @@ module Encase::Contracts
     end
 
     # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
-    end
-
-    # @implicit
     # (see [])
     def initialize(type)
+      @args = [type]
       @type = type
       raise Encase::Contract::MalformedContractError.new self,
         "Cannot negate a parameterized Code constraint" if @type.is_a?(Code)
@@ -425,18 +385,10 @@ module Encase::Contracts
     def ===(obj)
       !(@type === obj)
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@type.inspect}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # @!parse
-  #  # The {Int} tpye is a shorthand for validating integer values.
+  #  # The {Int} type is a shorthand for validating integer values.
   #  #
   #  #     Contract Any => Int
   #  #     def get_id(obj)
@@ -462,12 +414,7 @@ module Encase::Contracts
   #       x.even?
   #     end
   class Bool
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
-    end
+    self.extend Shared::ClassMethods
 
     # Validate that the argument is either `true` or `false`.
     # @param obj [Object] the value to validate
@@ -492,6 +439,8 @@ module Encase::Contracts
   #       code.call(self)
   #     end
   class Code
+    self.extend Shared::ClassMethods
+
     # Exposes the implied contract.
     attr_accessor :contract
 
@@ -503,13 +452,6 @@ module Encase::Contracts
     #         constrained code value
     def self.[](*types)
       self.new(*types)
-    end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
     end
 
     # (see #===)
@@ -565,6 +507,8 @@ module Encase::Contracts
   #       n - 1
   #     end
   class Test
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates a new {Test} constraint, which validates values by invoking
     # methods on the object being tested.
@@ -574,13 +518,6 @@ module Encase::Contracts
     #         with the given arguments, expecting a truthy value
     def self.[](method, *types)
       self.new(method, *types)
-    end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
     end
 
     # @implicit
@@ -596,14 +533,6 @@ module Encase::Contracts
     def ===(obj)
       obj.send(*@args) rescue false
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@args.map(&:inspect).join(', ')}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # The {Can} type is a specialization of {Test}, which specifically tests
@@ -622,21 +551,6 @@ module Encase::Contracts
   #       obj.save
   #     end
   class Can < Test
-
-    # Creates a new {Can} constraint, which tests whether objects respond to
-    # the listed methods.
-    # @param methods [Array[Symbol]] a list of methods to test for
-    # @return [Can<*methods>] a constraint that will test whether objects
-    # respond to all listed methods
-    def self.[](*methods)
-      self.new(*methods)
-    end
-
-    # @implicit
-    # (see [])
-    def initialize(*methods)
-      @args = methods
-    end
 
     # Validate that the specified object responds to all given messages.
     # @param obj [Object] the value to validate
@@ -665,6 +579,8 @@ module Encase::Contracts
   #       list.map { |x| x.to_i }
   #     end
   class List
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates a new {List} constraint, which tests that all elements of an
     # Enumerable pass one of the given constraints.
@@ -673,13 +589,6 @@ module Encase::Contracts
     #         of constraints
     def self.[](*types)
       self.new(*types)
-    end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
     end
 
     # Validate that the argument is an Enumerable.
@@ -692,7 +601,7 @@ module Encase::Contracts
     # @implicit
     # (see [])
     def initialize(*types)
-      @types = types.dup
+      @args = types.dup
       types.push(None) until types.length >= 2
       @constraint = Or[*types]
     end
@@ -704,14 +613,6 @@ module Encase::Contracts
     def ===(obj)
       self.class === obj && obj.all? { |e| @constraint === e }
     end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def to_s
-      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
-    end
-    alias_method :inspect, :to_s
   end
 
   # A {Splat} stands in for zero or more positional arguments, just as the
@@ -723,6 +624,8 @@ module Encase::Contracts
   #       numbers.inject { |a,b| a + b }
   #     end
   class Splat
+    self.send :include, Shared::InstanceMethods
+    self.extend Shared::ClassMethods
 
     # Creates a new constraint for describing the type of zero or more
     # arguments in a list.
@@ -734,6 +637,7 @@ module Encase::Contracts
 
     # @implicit
     def initialize(type)
+      @args = [type]
       @type = type
     end
 
@@ -749,11 +653,6 @@ module Encase::Contracts
     def optional?
       true
     end
-
-    # @implicit
-    # Provide a recognizable string representation.
-    def to_s; "Splat[#{@type.inspect}]"; end
-    alias_method :inspect, :to_s
   end
 
   # The {Block} constraint functions very much like the {Code} constraint, in
@@ -774,8 +673,7 @@ module Encase::Contracts
   #     def stringify(array, &block)
   #       array.map(&block).join
   #     end
-  class Block < Code
-  end
+  class Block < Code; end
 
   # This constraint allows you to write a contract for the return value of the
   # method or proc.  Most of the time, you will probably prefer to use the
