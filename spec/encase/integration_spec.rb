@@ -46,6 +46,13 @@ class IntegrationPoint
   end
 end
 
+top_level = self
+describe 'the top-level context' do
+  it 'should refuse to allow me to include decorators' do
+    expect { top_level.send(:include, Encase::Contracts) }.to raise_exception
+  end
+end
+
 describe IntegrationPoint do
   it 'should allow valid calls to class methods' do
     expect do

@@ -24,6 +24,10 @@ module Encase
       Module.new do
         # We want to include methods *only* into the class, not the instances.
         (class << self; self; end).send(:define_method, :included) do |base|
+          if base == Object
+            raise 'Please avoid including Decorators into the Object class.'
+          end
+
           base.extend(mod)
         end
       end
