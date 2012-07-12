@@ -50,6 +50,16 @@ require 'encase/contract'
 # * <h2>`None`</h2>
 # {include:Contracts::None}
 #
+# Logical Type Constraints
+# ========================
+#
+# * <h2>`And`</h2>
+# {include:Contracts::And}
+# * <h2>`Or`</h2>
+# {include:Contracts::Or}
+# * <h2>`Xor`</h2>
+# {include:Contracts::Xor}
+#
 # Type Constraints
 # ================
 #
@@ -118,6 +128,159 @@ module Encase::Contracts
     def self.to_s
       name.sub(/.*::/, '')
     end
+  end
+
+  # The {And} type intersects two or more constraints, validating that the
+  # argument is valid for every constraint.
+  #
+  #     Constraint And[Fixnum, (0..5)] => Any
+  #     def lookup(n)
+  #       array[n]
+  #     end
+  class And
+
+    # Creates a type constraint as an intersection of the supplied types.
+    # @param a [#===|Array|Hash] the constraints to intersect
+    # @param b [#===|Array|Hash] the constraints to intersect
+    # @param rest [Array[#===|Array|Hash]] additional constraints to intersect
+    # @return [And<a, b, *rest>] the intersection of the given types
+    def self.[](a, b, *rest)
+      self.new(a, b, *rest)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(a, b, *rest)
+      @types = [a, b, *rest]
+      class << @contract = Encase::Contract.new
+        def success(*); true; end
+        def failure(*); false; end
+      end
+    end
+
+    # Validate that the argument is either a Proc or a Method.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      @types.all? { |t| @contract.send(:validate, [t], [obj]) }
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
+    end
+    alias_method :inspect, :to_s
+  end
+
+  # The {Or} type unions two or more constraints, validating that the
+  # argument is valid for at least one constraint.
+  #
+  #     Constraint Or[String, Fixnum], Or[String, Fixnum] => Or[String, Fixnum]
+  #     def plus(a, b)
+  #       a + b
+  #     end
+  class Or
+
+    # Creates a type constraint as a union of the supplied types.
+    # @param a [#===|Array|Hash] the constraints to union
+    # @param b [#===|Array|Hash] the constraints to union
+    # @param rest [Array[#===|Array|Hash]] additional constraints to union
+    # @return [Or<a, b, *rest>] the union of the given types
+    def self.[](a, b, *rest)
+      self.new(a, b, *rest)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(a, b, *rest)
+      @types = [a, b, *rest]
+      class << @contract = Encase::Contract.new
+        def success(*); true; end
+        def failure(*); false; end
+      end
+    end
+
+    # Validate that the argument is either a Proc or a Method.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      @types.any? { |t| @contract.send(:validate, [t], [obj]) }
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
+    end
+    alias_method :inspect, :to_s
+  end
+
+  # The {Xor} type creates a new type that meets exactly one of the given
+  # constraints.
+  #
+  #     Constraint Xor[Array, String, proc { |x| x.length > 10 }] => Fixnum
+  #     def short_length(x)
+  #       x.length
+  #     end
+  class Xor
+
+    # Creates a type constraint as an exclusive union of the supplied types.
+    # @param a [#===|Array|Hash] the constraints to union
+    # @param b [#===|Array|Hash] the constraints to union
+    # @param rest [Array[#===|Array|Hash]] additional constraints to union
+    # @return [Xor<a, b, *rest>] the exclusive union of the given types
+    def self.[](a, b, *rest)
+      self.new(a, b, *rest)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(a, b, *rest)
+      @types = [a, b, *rest]
+      class << @contract = Encase::Contract.new
+        def success(*); true; end
+        def failure(*); false; end
+      end
+    end
+
+    # Validate that the argument is either a Proc or a Method.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      @types.one? { |t| @contract.send(:validate, [t], [obj]) }
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
+    end
+    alias_method :inspect, :to_s
   end
 
   # The {Code} type represents a first-class executable value, usually a Proc

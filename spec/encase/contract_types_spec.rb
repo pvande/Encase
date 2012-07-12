@@ -75,6 +75,156 @@ describe Encase::Contracts::None do
 end
 end
 
+describe "[Logical Type Constraints]" do
+describe Encase::Contracts::And do
+  And = Encase::Contracts::And
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  it 'should validate any value that matches all given constraints' do
+    contract = contract(And[Fixnum, (0..2)])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+
+    contract = contract(And[String, /\d+/])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['1234'], nil)
+  end
+
+  it 'should destructure arguments' do
+    contract = contract(And[{:a => Fixnum}, {:b => Fixnum}])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ {:a => 1, :b => 2} ], nil)
+  end
+
+  it 'should fail any value that does not meet all constraints' do
+    contract = contract(And[String, /\d+/])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, ['xyz'], nil)
+
+    contract = contract(And[Fixnum, (0..2)])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [1.0], nil)
+  end
+
+  it 'should self-describe' do
+    "#{And[Fixnum, String]}".should == 'And[Fixnum, String]'
+    "#{And[Fixnum, "String", nil]}".should == 'And[Fixnum, "String", nil]'
+    "#{And[Fixnum, {"String"=>nil}]}".should == 'And[Fixnum, {"String"=>nil}]'
+  end
+end
+
+describe Encase::Contracts::Or do
+  Or = Encase::Contracts::Or
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  it 'should validate any value that matches any given constraint' do
+    contract = contract(Or[Fixnum, String])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, ['string'], nil)
+
+    contract = contract(Or[String, Symbol, nil])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['1234'], nil)
+    contract.send(:around, proc { }, [:counters], nil)
+    contract.send(:around, proc { }, [nil], nil)
+
+    contract = contract(Or[String, /\d+/])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['xyz'], nil)
+    contract.send(:around, proc { }, ['1234'], nil)
+  end
+
+  it 'should destructure arguments' do
+    contract = contract(Or[{:a => Fixnum}, {:b => Fixnum}])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ {:a => 1} ], nil)
+    contract.send(:around, proc { }, [ {:b => 2} ], nil)
+    contract.send(:around, proc { }, [ {:a => 1, :b => 2} ], nil)
+  end
+
+  it 'should fail any value that does not meet any criteria' do
+    contract = contract(Or[String, /\d+/])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [:xyz], nil)
+
+    contract = contract(Or[Fixnum, (0..2)])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, ['1'], nil)
+  end
+
+  it 'should self-describe' do
+    "#{Or[Fixnum, String]}".should == 'Or[Fixnum, String]'
+    "#{Or[Fixnum, "String", nil]}".should == 'Or[Fixnum, "String", nil]'
+    "#{Or[Fixnum, {"String"=>nil}]}".should == 'Or[Fixnum, {"String"=>nil}]'
+  end
+end
+
+describe Encase::Contracts::Xor do
+  Xor = Encase::Contracts::Xor
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  it 'should validate any value that matches any one given constraint' do
+    contract = contract(Xor[Fixnum, String])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, ['string'], nil)
+
+    contract = contract(Xor[String, Symbol, nil])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['1234'], nil)
+    contract.send(:around, proc { }, [:counters], nil)
+    contract.send(:around, proc { }, [nil], nil)
+  end
+
+  it 'should destructure arguments' do
+    contract = contract(Xor[{:a => Fixnum}, {:b => Fixnum}])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ {:a => 1} ], nil)
+    contract.send(:around, proc { }, [ {:b => 2} ], nil)
+
+    contract = contract(Xor[{:a => 1}, {:b => 2}])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [ {:a => 1, :b => 2} ], nil)
+  end
+
+  it 'should fail any value that does not meet any criteria' do
+    contract = contract(Xor[String, /\d+/])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [:xyz], nil)
+
+    contract = contract(Xor[Fixnum, (0..2)])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, ['1'], nil)
+  end
+
+  it 'should fail any value that meets more than one criteria' do
+    contract = contract(Xor[Fixnum, (0..2)])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [1], nil)
+
+    contract = contract(Xor[String, /\d+/, proc { |x| x.length > 3 }])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, ['1234'], nil)
+  end
+
+  it 'should self-describe' do
+    "#{Xor[Fixnum, String]}".should == 'Xor[Fixnum, String]'
+    "#{Xor[Fixnum, "String", nil]}".should == 'Xor[Fixnum, "String", nil]'
+    "#{Xor[Fixnum, {"String"=>nil}]}".should == 'Xor[Fixnum, {"String"=>nil}]'
+  end
+end
+end
+
 describe "[Type Constraints]" do
 describe Encase::Contracts::Code do
   Code = Encase::Contracts::Code

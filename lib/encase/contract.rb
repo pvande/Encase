@@ -45,6 +45,7 @@ module Encase
         self.constraints = { :args => args }
       end
 
+      # If our only argument was a Block, we shouldn't validate parameters.
       if constraints[:args].last.is_a?(Encase::Contracts::Block) ||
          constraints[:args].last == Encase::Contracts::Block
         constraints[:block] = constraints[:args].shift
@@ -188,14 +189,14 @@ module Encase
           validate(*const.keys.map { |k| [const[k], arg[k]] }.transpose)
         else
           # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
-          (const.is_a?(Proc) ? const[arg] : const === arg).tap do
-            # Speaking of magic, we want to make sure that any code we're
-            # decorating actually checks its types.  To make that happen,
-            # we'll just do a little slight-of-hand on the `args` list here…
-            if const.is_a?(Encase::Contracts::Code)
-              args[args.length - arguments.length - 1] = const.wrap(arg)
-            end
-          end
+          (const.is_a?(Proc) ? const[arg] : const === arg)
+        end
+
+        # Speaking of magic, we want to make sure that any code we're
+        # decorating actually checks its types.  To make that happen, we'll
+        # just do a little slight-of-hand on the `args` list here…
+        if const.is_a?(Encase::Contracts::Code)
+          args[args.length - arguments.length - 1] = const.wrap(arg)
         end
 
         data = { :constraint => const, :value => arg }
