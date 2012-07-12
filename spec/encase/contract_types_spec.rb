@@ -2,7 +2,11 @@ require 'spec_helper'
 require 'encase/contracts'
 
 def contract(*args)
-  Encase::Contract.new(*args)
+  Encase::Contract.new(*args).tap do |c|
+    c.location = 'here'
+    c.decorated_class = Class.new
+    c.decorated_method = 'proc { }'
+  end
 end
 
 describe "[Abstract Type Constraints]" do
@@ -37,6 +41,68 @@ describe Encase::Contracts::Any do
 
   it 'should self-describe' do
     "#{Any}".should == 'Any'
+  end
+end
+
+describe Encase::Contracts::Maybe do
+  Maybe = Encase::Contracts::Maybe
+
+  it 'should validate any matching value, nil, or the absence of a value' do
+    contract = contract(Maybe[true])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [true], nil)
+    contract.send(:around, proc { }, [nil], nil)
+    contract.send(:around, proc { }, [], nil)
+
+    contract = contract(nil, Maybe[true])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [nil, true], nil)
+    contract.send(:around, proc { }, [nil, nil], nil)
+    contract.send(:around, proc { }, [nil], nil)
+
+    contract = contract(nil, [Maybe[true]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [nil, [true]], nil)
+    contract.send(:around, proc { }, [nil, [nil]], nil)
+    contract.send(:around, proc { }, [nil, []], nil)
+  end
+
+  it 'should fail to validate anything else' do
+    contract = contract(Maybe[true])
+    contract.should_receive(:failure).exactly(6).times
+    contract.send(:around, proc { }, [false], nil)
+    contract.send(:around, proc { }, [:symbol], nil)
+    contract.send(:around, proc { }, ['string'], nil)
+    contract.send(:around, proc { }, [[true]], nil)
+    contract.send(:around, proc { }, [{:a => true}], nil)
+    contract.send(:around, proc { }, [1234], nil)
+  end
+
+  it 'should validate wrapped code values' do
+    failures = 0
+    Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+    contract = contract(Maybe[Code[Fixnum => Fixnum]])
+    contract.send(:around, proc { }, [], nil)
+    contract.send(:around, proc { }, [nil], nil)
+    contract.send(:around, proc { |b| b[1] }, [proc { |x| x }], nil)
+    failures.should == 0
+  end
+
+  it 'should reject invalid wrapped code values' do
+    failures = 0
+    Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+    contract = contract(Maybe[Code[Fixnum => Fixnum]])
+    contract.send(:around, proc { }, [true], nil)
+    contract.send(:around, proc { |b| b['1'] }, [proc { |x| 1 }], nil)
+    contract.send(:around, proc { |b| b[1] }, [proc { |x| x.to_s }], nil)
+    failures.should == 3
+  end
+
+  it 'should self-describe' do
+    "#{Maybe[true]}".should == 'Maybe[true]'
+    "#{Maybe[Any]}".should == 'Maybe[Any]'
   end
 end
 

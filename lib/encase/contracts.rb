@@ -47,6 +47,8 @@ require 'encase/contract'
 #
 # * <h2>`Any`</h2>
 # {include:Contracts::Any}
+# * <h2>`Maybe`</h2>
+# {include:Contracts::Maybe}
 # * <h2>`None`</h2>
 # {include:Contracts::None}
 #
@@ -116,6 +118,68 @@ module Encase::Contracts
     def self.to_s
       name.sub(/.*::/, '')
     end
+  end
+
+  # The {Maybe} type can stand in for a type that might be `nil` or absent.
+  #
+  #     Contract Maybe[Int] => Maybe[String]
+  #     def i_to_s(n)
+  #       n.to_s unless n.nil?
+  #     end
+  class Maybe
+
+    # Creates an uncertain type constraint of the supplied type.
+    # @param type [#===] the constraint to negate
+    # @return [Not<type>] a constraint that validates the value, if present
+    def self.[](type)
+      self.new(type)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(type)
+      @type = type
+    end
+
+    # Validate that the argument does not exist, or matches the supplied type.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      @type === obj || obj.nil?
+    end
+
+    # Is this an optional parameter?
+    # @return [Bool] always returns `true`
+    def optional?
+      true
+    end
+
+    # @implicit
+    def method_missing(name, *args, &block)
+      @type.send(name, *args, &block)
+    end
+
+    # @implicit
+    # Allow the type to masquerade as its wrapped type.
+    # @return [Bool] if the class is an acurate description of the type
+    def is_a?(type)
+      super or @type.is_a?(type)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@type.inspect}]"
+    end
+    alias_method :inspect, :to_s
   end
 
   # The {None} type is used to validate the non-presence of an argument.  Note
@@ -428,6 +492,8 @@ module Encase::Contracts
   #       code.call(self)
   #     end
   class Code
+    # Exposes the implied contract.
+    attr_accessor :contract
 
     # Creates a new {Code} constraint describing the expected types of the
     # arguments and return value of the constrained code.

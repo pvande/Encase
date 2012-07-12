@@ -196,6 +196,9 @@ module Encase
         # just do a little slight-of-hand on the `args` list here…
         if const.is_a?(Encase::Contracts::Code)
           args[args.length - arguments.length - 1] = const.wrap(arg)
+          const.contract.location         = location
+          const.contract.decorated_class  = decorated_class
+          const.contract.decorated_method = 'proc { }'
         end
 
         data = { :constraint => const, :value => arg }
