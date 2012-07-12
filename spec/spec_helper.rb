@@ -31,17 +31,24 @@ RSpec.configure do |conf|
       end
 
       instance, n = BenchmarkingTest.new, 50_000
-      Benchmark.bm(15) do |x|
-        x.report('undecorated:') do
-          n.times { instance.undecorated_method(:one, '2', 3) }
-        end
+      {
+        :Validated => proc { },
+        :Disabled => proc { Encase::Decorator.disable },
+      }.each do |name, code|
+        puts "\n#{name}" ; code.call()
 
-        x.report('with decorator:') do
-          n.times { instance.with_decorator(:one, '2', 3) }
-        end
+        Benchmark.bm(15) do |x|
+          x.report('undecorated:') do
+            n.times { instance.undecorated_method(:one, '2', 3) }
+          end
 
-        x.report('with contract:') do
-          n.times { instance.with_contract(:one, '2', 3) }
+          x.report('with decorator:') do
+            n.times { instance.with_decorator(:one, '2', 3) }
+          end
+
+          x.report('with contract:') do
+            n.times { instance.with_contract(:one, '2', 3) }
+          end
         end
       end
     end

@@ -33,6 +33,21 @@ module Encase
       end
     end
 
+    @disabled = false
+
+    def self.disable
+      @disabled = true
+    end
+
+    def self.disabled?
+      return @disabled if instance_variable_defined?(:@disabled) && @disabled
+      superclass.disabled? if superclass.respond_to? :disabled?
+    end
+
+    def disabled?
+      self.class.disabled?
+    end
+
     # Wraps the given callable object in a Proc that passes it through to the
     # {#around} method (which itself delegates to {#before} and {#after}).
     # @param code [#call] the callable to augment
@@ -41,7 +56,11 @@ module Encase
       decorator = self
       proc do |*args, &block|
         code = code.bind(self) if code.respond_to? :bind
-        decorator.send(:around, code, args, block)
+        if decorator.disabled?
+          code.call(*args, &block)
+        else
+          decorator.send(:around, code, args, block)
+        end
       end
     end
 

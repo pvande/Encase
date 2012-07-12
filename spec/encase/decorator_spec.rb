@@ -5,19 +5,64 @@ describe Encase::Decorator do
   let(:decorator) { Encase::Decorator.new }
   let(:proc)      { Proc.new { |*| } }
 
-  describe '.module' do
-    subject { Disposable }
-
-    before do
-      class Disposable < Encase::Decorator
-        class Diaper < Encase::Decorator; end
-        def self.dynamic_subclass
-          Class.new(Encase::Decorator)
-        end
+  before do
+    class Disposable < Encase::Decorator
+      class Diaper < Encase::Decorator; end
+      def self.dynamic_subclass
+        Class.new(Encase::Decorator)
       end
     end
+  end
 
-    after { Object.send :remove_const, :Disposable }
+  after { Object.send :remove_const, :Disposable }
+
+  describe '.disable' do
+    after do
+      Disposable.instance_variable_set(:@disabled, false)
+      Encase::Decorator.instance_variable_set(:@disabled, false)
+    end
+
+    it 'should disable all instances of the decorator' do
+      proc = proc()
+      proc.should_receive(:call).with(1, 2, 3)
+      proc = decorator.wrap_callable(proc)
+      decorator.should_receive(:around).exactly(0).times
+
+      Encase::Decorator.disable
+      Encase::Decorator.should be_disabled
+      decorator.should be_disabled
+      proc.call(1, 2, 3)
+    end
+
+    it 'should disable all subclass instances of the decorator' do
+      proc, decorator = proc(), Disposable.new
+      proc.should_receive(:call).with(1, 2, 3)
+      proc = decorator.wrap_callable(proc)
+      decorator.should_receive(:around).exactly(0).times
+
+      Encase::Decorator.disable
+      Encase::Decorator.should be_disabled
+      Disposable.should be_disabled
+      decorator.should be_disabled
+      proc.call(1, 2, 3)
+    end
+
+    it 'should not disable all instances of the decorator' do
+      proc, decorator = proc(), Disposable.new
+      proc.should_receive(:call).with(1, 2, 3)
+      proc = decorator.wrap_callable(proc)
+      decorator.should_receive(:around).exactly(0).times
+
+      Disposable.disable
+      Disposable.should be_disabled
+      Encase::Decorator.should_not be_disabled
+      decorator.should be_disabled
+      proc.call(1, 2, 3)
+    end
+  end
+
+  describe '.module' do
+    subject { Disposable }
 
     it 'should create a module with a self-named function' do
       have_function = include('Disposable')
