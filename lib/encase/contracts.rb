@@ -81,6 +81,8 @@ require 'encase/contract'
 # {include:Contracts::Test}
 # * <h2>`Can`</h2>
 # {include:Contracts::Can}
+# * <h2>`List`</h2>
+# {include:Contracts::List}
 #
 # Signature Constraints
 # =====================
@@ -535,7 +537,7 @@ module Encase::Contracts
     # the listed methods.
     # @param methods [Array[Symbol]] a list of methods to test for
     # @return [Can<*methods>] a constraint that will test whether objects
-    # respond to all listed methods.
+    # respond to all listed methods
     def self.[](*methods)
       self.new(*methods)
     end
@@ -552,6 +554,74 @@ module Encase::Contracts
     def ===(obj)
       @args.all? { |m| obj.respond_to?(m) rescue false }
     end
+  end
+
+  # The {List} type is allows you to describe Enumerables, and to validate
+  # their contents against a list of constraints.  Multiple constraints will
+  # be joined as an {Or}.
+  #
+  #     Contract List
+  #     def enumerate(list)
+  #       list.each { |x| ... }
+  #     end
+  #
+  #     Contract List[String] => Bool
+  #     def concat(list)
+  #       list.join(', ')
+  #     end
+  #
+  #     Contract List[/^\d+$/, Fixnum] => List[Fixnum]
+  #     def numbers(list)
+  #       list.map { |x| x.to_i }
+  #     end
+  class List
+
+    # Creates a new {List} constraint, which tests that all elements of an
+    # Enumerable pass one of the given constraints.
+    # @param types [Array[#===|Array|Hash]] a list of constraints to test
+    # @return [List<*types>] a constraint that tests enumerables against a set
+    #         of constraints
+    def self.[](*types)
+      self.new(*types)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # Validate that the argument is an Enumerable.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def self.===(obj)
+      obj.is_a? Enumerable
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(*types)
+      @types = types.dup
+      types.push(None) until types.length >= 2
+      @constraint = Or[*types]
+    end
+
+    # Validate that the specified object is an enumerable, and that all of its
+    # elements are one of the given types.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      self.class === obj && obj.all? { |e| @constraint === e }
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@types.map(&:inspect).join(', ')}]"
+    end
+    alias_method :inspect, :to_s
   end
 
   # A {Splat} stands in for zero or more positional arguments, just as the

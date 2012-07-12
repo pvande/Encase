@@ -540,6 +540,80 @@ describe Encase::Contracts::Can do
     "#{Can[:to_proc, :to_s]}".should == 'Can[:to_proc, :to_s]'
   end
 end
+
+describe Encase::Contracts::List do
+  List = Encase::Contracts::List
+
+  it 'should validate arrays whose elements each match any given type' do
+    contract = contract(List[String])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ [] ], nil)
+    contract.send(:around, proc { }, [ ['a'] ], nil)
+    contract.send(:around, proc { }, [ %w[one two three] ], nil)
+
+    contract = contract(List[String, Fixnum])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ ['a', 'b', 'c'] ], nil)
+    contract.send(:around, proc { }, [ [1, 2, 3] ], nil)
+    contract.send(:around, proc { }, [ [1, '2', 3] ], nil)
+  end
+
+  it 'should reject arrays whose elements do not all match any given type' do
+    contract = contract(List[String])
+    contract.should_receive(:failure).exactly(2).times
+    contract.send(:around, proc { }, [ [1] ], nil)
+    contract.send(:around, proc { }, [ ['one', 'two', :three] ], nil)
+
+    contract = contract(List[String, Fixnum])
+    contract.should_receive(:failure).exactly(2).times
+    contract.send(:around, proc { }, [ ['a', 'b', :c] ], nil)
+    contract.send(:around, proc { }, [ [1, :two, 3] ], nil)
+  end
+
+  it 'should validate hashes whose elements each match any given type' do
+    contract = contract(List[[String, Fixnum]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ { 'a' => 1, 'b' => 2 } ], nil)
+    contract.send(:around, proc { }, [ { } ], nil)
+
+    contract = contract(List[[String, Fixnum], [Symbol, Symbol]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ { 'a' => 1, 'b' => 2, 'c' => 3 } ], nil)
+    contract.send(:around, proc { }, [ { :a => :a, :b => :b, :c => :c } ], nil)
+    contract.send(:around, proc { }, [ { 'a' => 1, :b => :b, 'c' => 3 } ], nil)
+  end
+
+  it 'should reject hashes whose elements do not all match any given type' do
+    contract = contract(List[[String, Fixnum]])
+    contract.should_receive(:failure).exactly(2).times
+    contract.send(:around, proc { }, [ { :a => 1, 'b' => 2 } ], nil)
+    contract.send(:around, proc { }, [ { 'a' => 1, 'b' => '2' } ], nil)
+
+    contract = contract(List[[String, Fixnum], [Symbol, Symbol]])
+    contract.should_receive(:failure).exactly(4).times
+    contract.send(:around, proc { }, [ {'a' => 1, :b => 2, 'c' => 3} ], nil)
+    contract.send(:around, proc { }, [ {:a => :a, :b => 'b', :c => :c} ], nil)
+    contract.send(:around, proc { }, [ {'a' => :a, :b => :b, 'c' => 3} ], nil)
+    contract.send(:around, proc { }, [ {1 => 'a', :b => :b, 'c' => 3} ], nil)
+  end
+
+  it 'should validate any Enumerable whose elements all match' do
+    contract = contract(List[proc { |x| x.length < 3 }])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ ('a'...'aaa') ], nil)
+  end
+
+  it 'should reject any Enumerable whose elements do not all match' do
+    contract = contract(List[proc { |x| x.length < 3 }])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [ ('a'..'zzz') ], nil)
+  end
+
+  it 'should self-describe' do
+    "#{List[String]}".should == 'List[String]'
+    "#{List[Fixnum, String]}".should == 'List[Fixnum, String]'
+  end
+end
 end
 
 describe "[Signature Constraints]" do
