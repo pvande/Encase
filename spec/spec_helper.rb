@@ -50,5 +50,5 @@ RSpec.configure do |conf|
   conf.after(:suite) do
     puts "\n"
     SimpleCov.at_exit.call
-  end
+  end unless ENV['CI'] or RUBY_VERSION =~ /^1\.8\./
 end
