@@ -146,6 +146,12 @@ module Encase::Contracts
     def self.to_s
       name.sub(/.*::/, '')
     end
+
+    # Is this an optional parameter?
+    # @return [Bool] always returns `true`
+    def self.optional?
+      true
+    end
   end
 
   # The {And} type intersects two or more constraints, validating that the
@@ -188,6 +194,12 @@ module Encase::Contracts
     # @return [Boolean] the result of the validation
     def ===(obj)
       @types.all? { |t| @contract.send(:validate, [t], [obj]) }
+    end
+
+    # Is this an optional parameter?
+    # @return [Bool] returns `true` if all types are optional
+    def optional?
+      @types.all? { |t| t.optional? rescue false }
     end
 
     # @implicit
@@ -241,6 +253,12 @@ module Encase::Contracts
       @types.any? { |t| @contract.send(:validate, [t], [obj]) }
     end
 
+    # Is this an optional parameter?
+    # @return [Bool] returns `true` if any types are optional
+    def optional?
+      @types.any? { |t| t.optional? rescue false }
+    end
+
     # @implicit
     # Generates a readable string representation of the constraint.
     # @return [String] a description of this constraint
@@ -290,6 +308,12 @@ module Encase::Contracts
     # @return [Boolean] the result of the validation
     def ===(obj)
       @types.one? { |t| @contract.send(:validate, [t], [obj]) }
+    end
+
+    # Is this an optional parameter?
+    # @return [Bool] returns `true` if any types are optional
+    def optional?
+      @types.any? { |t| t.optional? rescue false }
     end
 
     # @implicit
@@ -652,6 +676,12 @@ module Encase::Contracts
     # @return [Boolean] the result of the validation
     def ===(val)
       @type === val
+    end
+
+    # Is this an optional parameter?
+    # @return [Bool] always returns `true`
+    def optional?
+      true
     end
 
     # @implicit

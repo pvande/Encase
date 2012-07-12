@@ -169,8 +169,7 @@ module Encase
 
       while true
         if arguments.empty?
-          return constraints.all? { |c| c == Encase::Contracts::None } ||
-                 constraints.map(&:class) == [Encase::Contracts::Splat] ||
+          return constraints.all? { |c| c.optional? rescue false } ||
                  failure(:constraint => consts, :value => args)
         elsif constraints.empty?
           return failure(:constraint => consts, :value => args)

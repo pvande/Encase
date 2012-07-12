@@ -101,6 +101,22 @@ describe Encase::Contracts::And do
     contract.send(:around, proc { }, [1.0], nil)
   end
 
+  it 'should validate the lack of any optional values' do
+    And[None, None].should be_optional
+
+    contract = contract(And[None, None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [], nil)
+
+    contract = contract(Fixnum, And[None, None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+
+    contract = contract(Fixnum, [And[None, None]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1, []], nil)
+  end
+
   it 'should self-describe' do
     "#{And[Fixnum, String]}".should == 'And[Fixnum, String]'
     "#{And[Fixnum, "String", nil]}".should == 'And[Fixnum, "String", nil]'
@@ -135,6 +151,22 @@ describe Encase::Contracts::Or do
     contract.send(:around, proc { }, [ {:a => 1} ], nil)
     contract.send(:around, proc { }, [ {:b => 2} ], nil)
     contract.send(:around, proc { }, [ {:a => 1, :b => 2} ], nil)
+  end
+
+  it 'should validate the lack of any optional values' do
+    Or[true, None].should be_optional
+
+    contract = contract(Or[true, None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [], nil)
+
+    contract = contract(Fixnum, Or[true, None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+
+    contract = contract(Fixnum, [Or[true, None]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1, []], nil)
   end
 
   it 'should fail any value that does not meet any criteria' do
@@ -179,6 +211,22 @@ describe Encase::Contracts::Xor do
     contract = contract(Xor[{:a => 1}, {:b => 2}])
     contract.should_receive(:failure).exactly(1).times
     contract.send(:around, proc { }, [ {:a => 1, :b => 2} ], nil)
+  end
+
+  it 'should validate the lack of any optional values' do
+    Xor[true, None].should be_optional
+
+    contract = contract(Xor[true, None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [], nil)
+
+    contract = contract(Fixnum, Xor[true, None])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1], nil)
+
+    contract = contract(Fixnum, [Xor[true, None]])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [1, []], nil)
   end
 
   it 'should fail any value that does not meet any criteria' do
