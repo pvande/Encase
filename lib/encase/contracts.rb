@@ -65,6 +65,12 @@ require 'encase/contract'
 # Type Constraints
 # ================
 #
+# * <h2>`Int`</h2>
+# {include:Contracts::Int}
+# * <h2>`Num`</h2>
+# {include:Contracts::Num}
+# * <h2>`Bool`</h2>
+# {include:Contracts::Bool}
 # * <h2>`Code`</h2>
 # {include:Contracts::Code}
 #
@@ -329,6 +335,48 @@ module Encase::Contracts
       "#{self.class}[#{@type.inspect}]"
     end
     alias_method :inspect, :to_s
+  end
+
+  # @!parse
+  #  # The {Int} tpye is a shorthand for validating integer values.
+  #  #
+  #  #     Contract Any => Int
+  #  #     def get_id(obj)
+  #  #       obj.__id__
+  #  #     end
+  #  class Int; end
+  const_set(:Int, Integer)
+
+  # @!parse
+  #  # The {Num} type is a shorthand for validating all valid numeric values.
+  #  #
+  #  #     Contract Num, Num => Num
+  #  #     def time(x, y)
+  #  #       x * y
+  #  #     end
+  #  class Num; end
+  const_set(:Num, Numeric)
+
+  # The {Bool} type gives you a way to describe strict boolean values.
+  #
+  #     Contract Num => Bool
+  #     def multiple_of_two(x)
+  #       x.even?
+  #     end
+  class Bool
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # Validate that the argument is either `true` or `false`.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def self.===(obj)
+      [true, false].include? obj
+    end
   end
 
   # The {Code} type represents a first-class executable value, usually a Proc

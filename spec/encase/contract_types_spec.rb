@@ -1,13 +1,13 @@
 require 'spec_helper'
 require 'encase/contracts'
 
+def contract(*args)
+  Encase::Contract.new(*args)
+end
+
 describe "[Abstract Type Constraints]" do
 describe Encase::Contracts::Any do
   Any = Encase::Contracts::Any
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   it 'should validate any value' do
     contract = contract(Any)
@@ -43,10 +43,6 @@ end
 describe Encase::Contracts::None do
   None = Encase::Contracts::None
 
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
-
   it 'should refuse to validate any value' do
     contract = contract(None)
     contract.should_receive(:failure).exactly(7).times
@@ -78,10 +74,6 @@ end
 describe "[Logical Type Constraints]" do
 describe Encase::Contracts::And do
   And = Encase::Contracts::And
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   it 'should validate any value that matches all given constraints' do
     contract = contract(And[Fixnum, (0..2)])
@@ -118,10 +110,6 @@ end
 
 describe Encase::Contracts::Or do
   Or = Encase::Contracts::Or
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   it 'should validate any value that matches any given constraint' do
     contract = contract(Or[Fixnum, String])
@@ -168,10 +156,6 @@ end
 
 describe Encase::Contracts::Xor do
   Xor = Encase::Contracts::Xor
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   it 'should validate any value that matches any one given constraint' do
     contract = contract(Xor[Fixnum, String])
@@ -226,10 +210,6 @@ end
 
 describe Encase::Contracts::Not do
   Not = Encase::Contracts::Not
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   it 'should validate any value that matches any given constraint' do
     contract = contract(Not[Fixnum])
@@ -300,12 +280,87 @@ end
 end
 
 describe "[Type Constraints]" do
+describe Encase::Contracts::Int do
+  Int = Encase::Contracts::Int
+
+  it 'should match all valid integers' do
+    contract = contract(Int)
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [0], nil)
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, [-1], nil)
+    contract.send(:around, proc { }, [9999999999999999999], nil)
+    contract.send(:around, proc { }, [-9999999999999999999], nil)
+  end
+
+  it 'should refuse all non-integers' do
+    contract = contract(Int)
+    contract.should_receive(:failure).exactly(7).times
+    contract.send(:around, proc { }, [Object.new], nil)
+    contract.send(:around, proc { }, ['0'], nil)
+    contract.send(:around, proc { }, [0.0], nil)
+    contract.send(:around, proc { }, [1.0], nil)
+    contract.send(:around, proc { }, [-1.0], nil)
+    contract.send(:around, proc { }, [ 1 / 0.0], nil)  # Infinity
+    contract.send(:around, proc { }, [-1 / 0.0], nil)  # -Infinity
+  end
+end
+
+describe Encase::Contracts::Num do
+  Num = Encase::Contracts::Num
+
+  it 'should match all valid numbers' do
+    contract = contract(Num)
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [0], nil)
+    contract.send(:around, proc { }, [1], nil)
+    contract.send(:around, proc { }, [1.0], nil)
+    contract.send(:around, proc { }, [1.5], nil)
+    contract.send(:around, proc { }, [-1], nil)
+    contract.send(:around, proc { }, [-1.0], nil)
+    contract.send(:around, proc { }, [ 1 / 0.0], nil)  # Infinity
+    contract.send(:around, proc { }, [-1 / 0.0], nil)  # -Infinity
+  end
+
+  it 'should refuse all non-numbers' do
+    contract = contract(Num)
+    contract.should_receive(:failure).exactly(6).times
+    contract.send(:around, proc { }, [Object.new], nil)
+    contract.send(:around, proc { }, [nil], nil)
+    contract.send(:around, proc { }, ['0'], nil)
+    contract.send(:around, proc { }, [:symbol], nil)
+    contract.send(:around, proc { }, [ [1] ], nil)
+    contract.send(:around, proc { }, [ { } ], nil)
+  end
+end
+
+describe Encase::Contracts::Bool do
+  Bool = Encase::Contracts::Bool
+
+  it 'should match all valid booleans' do
+    contract = contract(Bool)
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [true], nil)
+    contract.send(:around, proc { }, [false], nil)
+  end
+
+  it 'should refuse all non-booleans' do
+    contract = contract(Bool)
+    contract.should_receive(:failure).exactly(5).times
+    contract.send(:around, proc { }, [nil], nil)
+    contract.send(:around, proc { }, ['true'], nil)
+    contract.send(:around, proc { }, [:symbol], nil)
+    contract.send(:around, proc { }, [ [1] ], nil)
+    contract.send(:around, proc { }, [ { } ], nil)
+  end
+
+  it 'should self-describe' do
+    "#{Bool}".should == 'Bool'
+  end
+end
+
 describe Encase::Contracts::Code do
   Code = Encase::Contracts::Code
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   describe 'without parameters' do
     it 'should validate that the value is a Proc or Method' do
@@ -391,10 +446,6 @@ end
 describe "[Signature Constraints]" do
 describe Encase::Contracts::Splat do
   Splat = Encase::Contracts::Splat
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   {
     "a simple splat" => [
@@ -577,10 +628,6 @@ end
 describe Encase::Contracts::Block do
   Block = Encase::Contracts::Block
 
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
-
   describe 'without parameters' do
     it 'should validate that the block exists' do
       contract = contract(Block)
@@ -647,10 +694,6 @@ end
 
 describe Encase::Contracts::Returns do
   Returns = Encase::Contracts::Returns
-
-  def contract(*args)
-    Encase::Contract.new(*args)
-  end
 
   it 'should validate the returned value of a callable' do
     contract = contract(Returns[String])
