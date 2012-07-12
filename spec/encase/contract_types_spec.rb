@@ -223,6 +223,80 @@ describe Encase::Contracts::Xor do
     "#{Xor[Fixnum, {"String"=>nil}]}".should == 'Xor[Fixnum, {"String"=>nil}]'
   end
 end
+
+describe Encase::Contracts::Not do
+  Not = Encase::Contracts::Not
+
+  def contract(*args)
+    Encase::Contract.new(*args)
+  end
+
+  it 'should validate any value that matches any given constraint' do
+    contract = contract(Not[Fixnum])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['1'], nil)
+    contract.send(:around, proc { }, [:symbol], nil)
+
+    contract = contract(Not[/\d+/])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['xyz'], nil)
+  end
+
+  it 'should not destructure arguments' do
+    contract = contract(Not[{:a => Fixnum}])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ {:a => 1} ], nil)
+
+    contract = contract(Not[ [Fixnum] ])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, [ [1] ], nil)
+
+    contract = contract({:a => Not[Fixnum]})
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [ {:a => 1} ], nil)
+
+    contract = contract([Not[Fixnum]])
+    contract.should_receive(:failure).with(hash_including :value => 1)
+    contract.should_receive(:failure).with(hash_including :value => [1])
+    contract.send(:around, proc { }, [ [1] ], nil)
+  end
+
+  it 'should fail any value that does not meet any criteria' do
+    contract = contract(Not[String])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, ['xyz'], nil)
+
+    contract = contract(Not[(0..2)])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [1], nil)
+  end
+
+  it 'should properly validate negated Code constraints' do
+    contract = contract(Not[Code])
+    contract.should_receive(:failure).exactly(0).times
+    contract.send(:around, proc { }, ['xyz'], nil)
+
+    contract = contract(Not[Code])
+    contract.should_receive(:failure).exactly(1).times
+    contract.send(:around, proc { }, [proc { }], nil)
+  end
+
+  it 'should refuse to negate parameterized Code constraints' do
+    expect do
+      contract(Not[Code[Fixnum]])
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+
+    expect do
+      contract(Not[Code[]])
+    end.to raise_exception(Encase::Contract::MalformedContractError)
+  end
+
+  it 'should self-describe' do
+    "#{Not[Fixnum]}".should == 'Not[Fixnum]'
+    "#{Not[nil]}".should == 'Not[nil]'
+    "#{Not[{"String"=>nil}]}".should == 'Not[{"String"=>nil}]'
+  end
+end
 end
 
 describe "[Type Constraints]" do

@@ -59,6 +59,8 @@ require 'encase/contract'
 # {include:Contracts::Or}
 # * <h2>`Xor`</h2>
 # {include:Contracts::Xor}
+# * <h2>`Not`</h2>
+# {include:Contracts::Not}
 #
 # Type Constraints
 # ================
@@ -133,7 +135,7 @@ module Encase::Contracts
   # The {And} type intersects two or more constraints, validating that the
   # argument is valid for every constraint.
   #
-  #     Constraint And[Fixnum, (0..5)] => Any
+  #     Contract And[Fixnum, (0..5)] => Any
   #     def lookup(n)
   #       array[n]
   #     end
@@ -184,7 +186,7 @@ module Encase::Contracts
   # The {Or} type unions two or more constraints, validating that the
   # argument is valid for at least one constraint.
   #
-  #     Constraint Or[String, Fixnum], Or[String, Fixnum] => Or[String, Fixnum]
+  #     Contract Or[String, Fixnum], Or[String, Fixnum] => Or[String, Fixnum]
   #     def plus(a, b)
   #       a + b
   #     end
@@ -235,7 +237,7 @@ module Encase::Contracts
   # The {Xor} type creates a new type that meets exactly one of the given
   # constraints.
   #
-  #     Constraint Xor[Array, String, proc { |x| x.length > 10 }] => Fixnum
+  #     Contract Xor[Array, String, proc { |x| x.length > 10 }] => Fixnum
   #     def short_length(x)
   #       x.length
   #     end
@@ -283,6 +285,52 @@ module Encase::Contracts
     alias_method :inspect, :to_s
   end
 
+  # The {Not} type inverts the constraint of the given type.
+  #
+  #     Contract Not[Fixnum] => Fixnum
+  #     def opinionated(x)
+  #       raise "Hey!" if x.is_a? Fixnum
+  #       x.__id__
+  #     end
+  class Not
+    # Creates a type constraint as a negation of the supplied type.
+    # @param type [#===] the constraint to negate
+    # @return [Not<type>] a constraint that validates the inverse constraint
+    def self.[](type)
+      self.new(type)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
+    end
+
+    # @implicit
+    # (see [])
+    def initialize(type)
+      @type = type
+      raise Encase::Contract::MalformedContractError.new self,
+        "Cannot negate a parameterized Code constraint" if @type.is_a?(Code)
+    end
+
+    # Validate that the argument does not match the supplied type.
+    # @param obj [Object] the value to validate
+    # @return [Boolean] the result of the validation
+    def ===(obj)
+      !(@type === obj)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def to_s
+      "#{self.class}[#{@type.inspect}]"
+    end
+    alias_method :inspect, :to_s
+  end
+
   # The {Code} type represents a first-class executable value, usually a Proc
   # or a bound Method.  More than just a union type, this type will also allow
   # you to describe the expected input and output types of the value, which
@@ -307,6 +355,13 @@ module Encase::Contracts
     #         constrained code value
     def self.[](*types)
       self.new(*types)
+    end
+
+    # @implicit
+    # Generates a readable string representation of the constraint.
+    # @return [String] a description of this constraint
+    def self.to_s
+      name.sub(/.*::/, '')
     end
 
     # (see #===)
@@ -336,13 +391,6 @@ module Encase::Contracts
     # @return (see Decorator#wrap_callable)
     def wrap(callable)
       @contract.wrap_callable(callable)
-    end
-
-    # @implicit
-    # Generates a readable string representation of the constraint.
-    # @return [String] a description of this constraint
-    def self.to_s
-      name.sub(/.*::/, '')
     end
 
     # @implicit
