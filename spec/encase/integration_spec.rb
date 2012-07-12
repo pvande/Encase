@@ -46,10 +46,49 @@ class IntegrationPoint
   end
 end
 
+module IntegrationModule
+  include Encase::Contracts
+
+  Contract Int => Int
+  def triple(n)
+    n * 3
+  end
+
+  Contract Num, Num => Num
+  def self.multiply(n, m)
+    n * m
+  end
+end
+
 top_level = self
 describe 'the top-level context' do
   it 'should refuse to allow me to include decorators' do
     expect { top_level.send(:include, Encase::Contracts) }.to raise_exception
+  end
+end
+
+describe IntegrationModule do
+  it 'should allow valid calls to class methods' do
+    expect do
+      subject.multiply(1, 2).should == 2
+      subject.multiply(3, 20).should == 60
+    end.to_not raise_exception
+  end
+
+  it 'should disallow invalid calls to class methods' do
+    expect { subject.multiply('1', '2') }.to raise_exception
+    expect { subject.multiply([1], [2]) }.to raise_exception
+  end
+
+  describe '(included in a class)' do
+    subject { Class.new { include IntegrationModule }.new }
+
+    it 'should allow valid calls to instance methods' do
+      expect do
+        subject.triple(1).should == 3
+        subject.triple(5).should == 15
+      end.to_not raise_exception
+    end
   end
 end
 
