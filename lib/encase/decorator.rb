@@ -38,15 +38,24 @@ module Encase
 
     @disabled = false
 
+    # Disables all instances of this Decorator, and all instances of all
+    # subclasses.  Disabled Decorators will bypass all non-essential
+    # functionality, in favor of performance.
     def self.disable
       @disabled = true
     end
 
+    # Is this Decorator type disabled?
+    # @return [Boolean] `true` if this or any superclass of this decorator has
+    #         been disabled; otherwise `false`
     def self.disabled?
       return @disabled if instance_variable_defined?(:@disabled) && @disabled
       superclass.disabled? if superclass.respond_to? :disabled?
     end
 
+    # Is this Decorator instance disabled?
+    # @return [Boolean] `true` if the decorator type is disabled, otherwise
+    #         `false`
     def disabled?
       self.class.disabled?
     end

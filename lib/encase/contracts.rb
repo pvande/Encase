@@ -673,7 +673,14 @@ module Encase::Contracts
   #     def stringify(array, &block)
   #       array.map(&block).join
   #     end
-  class Block < Code; end
+  class Block < Code
+
+    # Is this a non-argument parameter?
+    # @return [Bool] always returns `true`
+    def non_argument?
+      true
+    end
+  end
 
   # This constraint allows you to write a contract for the return value of the
   # method or proc.  Most of the time, you will probably prefer to use the
@@ -722,6 +729,12 @@ module Encase::Contracts
     # @return [Returns<type>] a constraint that validates the return value
     def self.[](type)
       super(nil, type)
+    end
+
+    # Is this a non-argument parameter?
+    # @return [Bool] always returns `true`
+    def non_argument?
+      true
     end
 
     # Validate that the return value conforms to the given interface.

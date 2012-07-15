@@ -34,29 +34,9 @@ module Encase
     #   Contract.new String, Fixnum, { :count => Fixnum }, Returns[String]
     # @example Shorthand Return Type Validation
     #   Contract.new Fixnum, Fixnum => Fixnum
-    # @param args [Array[#===]] a list of parameter constraints
+    # @param args [Array[#===|Array|Hash]] a list of parameter constraints
     def initialize(*args)
-      if args.last.is_a?(Hash) && args.last.size == 1
-        self.constraints = {
-          :args   => args[0...-1] + args.last.keys,
-          :return => args.last.values.last
-        }
-      else
-        self.constraints = { :args => args }
-      end
-
-      # If our only argument was a Block, we shouldn't validate parameters.
-      if constraints[:args].last.is_a?(Encase::Contracts::Block) ||
-         constraints[:args].last == Encase::Contracts::Block
-        constraints[:block] = constraints[:args].shift
-        constraints.delete :args if constraints[:args].empty?
-      end
-
-      # If we were invoked with only a {Contracts::Returns} constraint, we
-      # should avoid trying to validate any of the parameters.
-      if args.last.is_a?(Encase::Contracts::Returns) && args.size == 1
-        constraints.delete :args
-      end
+      @constraints = parse_constraints(args)
 
       # Check for superfluous {Returns}
       find_overzealous_returns constraints[:args] if constraints.has_key? :args
@@ -110,6 +90,35 @@ module Encase
     alias_method :inspect, :to_s
 
     private
+
+    # Parses the arguments list passed to the constructor, and produces a
+    # useful Hash representation of those constraints.
+    # @param args (see #initialize)
+    # @return [Hash] a hash of the constraints, grouped by function
+    def parse_constraints(args)
+      hash = { :args => args.dup }
+
+      if hash[:args].last.is_a?(Hash) && hash[:args].last.size == 1
+        return_hash   = hash[:args].pop
+        hash[:return] = return_hash.values.last
+        hash[:args].push(*return_hash.keys)
+      end
+
+      # Handle {Contract::Block} arguments by removing them from the arguments
+      # list and handling them separately.
+      block = Encase::Contracts::Block
+      if hash[:args].last.instance_eval { is_a?(block) or self == block }
+        hash[:block] = hash[:args].pop
+      end
+
+      # If we were invoked with only non-argument constraints, we should avoid
+      # trying to validate any of the parameters.
+      if args.all? { |a| a.respond_to?(:non_argument?) && a.non_argument? }
+        hash.delete :args unless args.empty?
+      end
+
+      return hash
+    end
 
     # @!group Decorator Overrides
 
