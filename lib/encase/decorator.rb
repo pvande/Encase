@@ -18,7 +18,10 @@ module Encase
     # @param name [#to_s] the name of the decorator method
     # @return [Module] a module containing the decorator (and setup code)
     def self.module(name=self.name)
-      raise "Can't automatically detect name of anonymous classes" if name.nil?
+      if [nil, ''].include? name
+        raise "Can't automatically detect name of anonymous classes"
+      end
+
       name = "#{name}"[/[^:]*$/]
       mod = @modules[self][name]
       Module.new do
