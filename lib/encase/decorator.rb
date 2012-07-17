@@ -13,6 +13,9 @@ module Encase
     # @return [String] The name of the decorated method.
     attr_accessor :decorated_method
 
+    # @return [Object] The object being decorated.
+    attr_accessor :binding
+
     # Generate a module containing a method for applying the decorator.  This
     # may be named explicitly, but defaults to the same name as the class.
     # @param name [#to_s] the name of the decorator method
@@ -71,6 +74,7 @@ module Encase
         if decorator.disabled?
           code.call(*args, &block)
         else
+          decorator.binding = self
           decorator.send(:around, code, args, block)
         end
       end
@@ -83,7 +87,7 @@ module Encase
     # Called from the wrapper Proc.
     # @api extender Intended to be an extension point for subclasses
     # @param code [#call] the callable being augmented
-    # @param args [Array[Any]] the arguments the wrapper was invoked with
+    # @param args [Array] the arguments the wrapper was invoked with
     # @param block [Proc] the block the wrapper was invoked with
     # @return the result of calling `code`
     def around(code, args, block)
@@ -101,7 +105,7 @@ module Encase
     # Called after the wrapped callable.
     # @api extender Intended to be an extension point for subclasses
     # @param code [#call] the callable being augmented
-    # @param args [Array[Any]] the arguments the wrapper was invoked with
+    # @param args [Array] the arguments the wrapper was invoked with
     # @param block [Proc] the block the wrapper was invoked with
     # @param retval [Any] the result of having called `code`
     def after(code, args, block, retval); end
@@ -165,6 +169,8 @@ module Encase
                   send(hook, m)
                 end
               end
+
+              deco
             end
           end
         end
