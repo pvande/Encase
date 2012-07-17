@@ -533,6 +533,20 @@ describe Encase::Contracts::Code do
       failures.should == 1
     end
 
+    it 'should validate parameter constraints for code in any position' do
+      contract = contract(Int, Code[Fixnum], Int, Int)
+      failures = 0
+      Encase::Contract.any_instance.stub(:failure) { failures += 1 }
+
+      callable = contract.wrap_callable(proc { |_, x, *| x[1] })
+      callable[1, lambda { |y| y * 3 }, 2, 3].should == 3
+      failures.should == 0
+
+      callable = contract.wrap_callable(proc { |_, x, *| x['1'] })
+      callable[1, lambda { |y| y * 3 }, 2, 3].should == '111'
+      failures.should == 1
+    end
+
     it 'should validate return value constraints when the code is called' do
       contract = contract(Code[Returns[Fixnum]])
       failures = 0
@@ -1077,7 +1091,7 @@ describe Encase::Contracts::Returns do
   it 'should self-describe' do
     "#{Returns[Fixnum]}".should == 'Returns[Fixnum]'
     "#{Returns[Fixnum => Fixnum]}".should == 'Returns[{Fixnum=>Fixnum}]'
-    "#{Returns[Returns[String]]}".should == 'Returns[Returns[String]]'
+    "#{Returns[Returns[String]]}".should == 'Returns[String]'
   end
 end
 end

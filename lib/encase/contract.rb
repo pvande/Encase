@@ -60,43 +60,44 @@ module Encase
     def validate(consts, args)
       constraints, arguments = consts.dup, args.dup
 
-      while true
-        if arguments.empty?
-          return constraints.all? { |c| c.optional? rescue false } ||
-                 failure(:constraint => consts, :value => args)
-        elsif constraints.empty?
+      until arguments.empty?
+        if constraints.empty?
           return failure(:constraint => consts, :value => args)
         end
 
-        const, arg = constraints.shift, arguments.shift
+        data = {
+          :constraint => const = constraints.shift,
+          :value      => arg   = arguments.shift,
+        }
 
-        if const.is_a?(Encase::Contracts::Splat)
-          constraints.unshift(const)      if constraints.size < arguments.size
-          arguments.unshift(arg) and next if constraints.size > arguments.size
-        end
-
-        result = if const.is_a? Array
-          validate(const, arg) if arg.is_a?(Array)
-        elsif const.is_a?(Hash) && arg.is_a?(Hash)
-          validate(*const.keys.map { |k| [const[k], arg[k]] }.transpose)
-        else
-          # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
-          (const.is_a?(Proc) ? const[arg] : const === arg)
+        # If our current argument is a {Contracts::Splat}, we should make sure
+        # to use it to balance our argument list.
+        constraints_left = constraints.size
+        arguments_left   = arguments.size
+        if constraints_left != arguments_left && const.is_a?(Contracts::Splat)
+          if constraints_left < arguments_left
+            constraints.unshift(const)
+          else
+            arguments.unshift(arg); redo
+          end
         end
 
         # Speaking of magic, we want to make sure that any code we're
         # decorating actually checks its types.  To make that happen, we'll
         # just do a little slight-of-hand on the `args` list here…
-        if const.is_a?(Encase::Contracts::Code)
-          args[args.length - arguments.length - 1] = const.wrap(arg)
-          const.contract.location         = location
-          const.contract.decorated_class  = decorated_class
-          const.contract.decorated_method = 'proc { }'
+        if const.is_a?(Contracts::Code)
+          contract = const.contract
+          args[-1 - arguments_left] = contract.wrap_callable(arg)
+          contract.location         = location
+          contract.decorated_class  = decorated_class
+          contract.decorated_method = 'proc { }'
         end
 
-        data = { :constraint => const, :value => arg }
-        return false unless (result ? success(data) : failure(data))
+        return false if !(compare(const, arg) ? success(data) : failure(data))
       end
+
+      return constraints.all? { |c| c.optional? rescue false } ||
+             failure(:constraint => consts, :value => args)
     end
 
     # @!group Contract Validation Callbacks
@@ -121,24 +122,36 @@ module Encase
       raise ContractViolationException.new(self, data.merge(:loc => location))
     end
 
-     # @implicit
-     # Generates a readable string representation of the Contract.
-     # @return [String] a description of this Contract
-     def to_s
-       sig = "Contract "
-       if constraints.has_key?(:args) && !constraints[:args].empty?
-         sig += constraints[:args].map(&:inspect).join(', ')
-         if constraints.has_key? :return
-           sig += " => " + constraints[:return].inspect
-         end
-       elsif constraints.has_key? :return
-         sig += "Returns[#{constraints[:return].inspect}]"
-       else
-         sig = "Contract()"
-       end
-       return sig
+    # @implicit
+    # Generates a readable string representation of the Contract.
+    # @return [String] a description of this Contract
+    def to_s
+      return "Contract()" if constraints.empty?
+      "Contract #{Contract.generate_signature(constraints)}"
     end
     alias_method :inspect, :to_s
+
+    # Generates a string representation of the given constraints.
+    # @param constraints [Hash] the constraints to serialize
+    # @return [String] a description of the constraints
+    def self.generate_signature(constraints)
+      has_args  = constraints.has_key? :args
+      has_block = constraints.has_key? :block
+      has_ret   = constraints.has_key? :return
+
+      retval = Contracts::Returns[constraints[:return]] if has_ret
+
+      if has_args || has_block
+        args = []
+        args.push *constraints[:args] if has_args
+        args.push constraints[:block] if has_block
+        args.join(', ') << "#{has_ret ? ' => ' + retval.value.inspect : ''}"
+      elsif has_ret
+        retval.inspect
+      else
+        ""
+      end
+    end
 
     # @!endgroup
 
@@ -151,26 +164,42 @@ module Encase
     def parse_constraints(args)
       hash = { :args => args.dup }
 
-      if hash[:args].last.is_a?(Hash) && hash[:args].last.size == 1
-        return_hash   = hash[:args].pop
-        hash[:return] = return_hash.values.last
-        hash[:args].push(*return_hash.keys)
+      last_argument = hash[:args].last
+      if last_argument.is_a?(Hash) && last_argument.size == 1
+        hash[:return] = last_argument.values.last
+        hash[:args].pop
+        hash[:args].push(*last_argument.keys)
       end
 
       # Handle {Contract::Block} arguments by removing them from the arguments
       # list and handling them separately.
-      block = Encase::Contracts::Block
-      if hash[:args].last.instance_eval { is_a?(block) or self == block }
+      last_argument, block_type = hash[:args].last, Contracts::Block
+      if last_argument.is_a?(block_type) || last_argument == block_type
         hash[:block] = hash[:args].pop
       end
 
       # If we were invoked with only non-argument constraints, we should avoid
       # trying to validate any of the parameters.
-      if args.all? { |a| a.respond_to?(:non_argument?) && a.non_argument? }
-        hash.delete :args unless args.empty?
-      end
+      hash.delete :args if args.all? { |a| a.non_argument? rescue false }
 
       return hash
+    end
+
+    # A simple function for handling the comparison of a constraint and an
+    # argument.
+    # @param const [#===|Array|Hash] the constraint to validate
+    # @param arg [Object] the value to validate
+    # @return [Boolean] the result of the comparison
+    def compare(const, arg)
+      if [const.class, arg.class] == [Array, Array]
+        validate(const, arg)
+      elsif [const.class, arg.class] == [Hash, Hash]
+        keys = const.keys
+        validate(const.values_at(*keys), arg.values_at(*keys))
+      else
+        # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
+        (const.is_a?(Proc) ? const[arg] : const === arg)
+      end
     end
 
     # @!group Decorator Overrides
@@ -333,7 +362,7 @@ module Encase
         msg = "\nMalformed Contract for"
         msg += "\n  #{contract}"
         msg += "\n  #{message}"
-        
+
         super msg
       end
     end

@@ -475,19 +475,11 @@ module Encase::Contracts
       obj.is_a?(Proc) || obj.is_a?(Method)
     end
 
-    # Passes the callable through to the underlying {Contract} to be wrapped
-    # in validation behaviors.
-    # @param (see Decorator#wrap_callable)
-    # @return (see Decorator#wrap_callable)
-    def wrap(callable)
-      @contract.wrap_callable(callable)
-    end
-
     # @implicit
     # Generates a readable string representation of the constraint.
     # @return [String] a description of this constraint
     def to_s
-      "#{self.class}[#{@contract.to_s.sub(/^Contract( |\(\))/, '')}]"
+      "#{self.class}[#{Encase::Contract.generate_signature(@contract.constraints)}]"
     end
     alias_method :inspect, :to_s
   end
@@ -741,16 +733,23 @@ module Encase::Contracts
     # @param val [Object] the value to validate
     # @return [Boolean] the result of the validation
     def ===(val)
-      values.first === val
+      value === val
     end
 
     # @implicit
     # Allows us to avoid adding any additional parameter constraints.
     def keys; []; end
 
+    # Returns the wrapped value.  If the wrapped value is itself a {Returns},
+    # the inner value is retrieved instead.
+    # @returns [Object] the wrapped value
+    def value
+      values[0].is_a?(self.class) ? values[0].value : values[0]
+    end
+
     # @implicit
     # Provide a recognizable string representation.
-    def to_s; "Returns#{values.inspect}"; end
+    def to_s; "Returns[#{value.inspect}]"; end
     alias_method :inspect, :to_s
   end
 

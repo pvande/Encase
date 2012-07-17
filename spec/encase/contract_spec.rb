@@ -181,15 +181,19 @@ describe Encase::Contract do
       contract.send(:around, @proc, args, block)
     end
 
+    def constraint
+      double(:non_argument? => false)
+    end
+
     it 'should validate the passed arguments' do
-      @constraints = [(x=double), (y=double), (z=double)]
+      @constraints = [(x=constraint), (y=constraint), (z=constraint)]
       contract.should_receive(:validate).with([x, y, z], [1, 2, 3])
       subject(1, 2, 3)
     end
 
     it 'should validate the return value if given one' do
       @proc = proc { |x, y| x + y * 2 }
-      @constraints = [(x=double), { (y=double) => (output=double) }]
+      @constraints = [(x=constraint), {(y=constraint) => (output=constraint)}]
       contract.should_receive(:validate).with([x, y], [3, 2]).and_return(true)
       contract.should_receive(:validate).with([output], [7])
       subject(3, 2)
@@ -206,6 +210,9 @@ describe Encase::Contract do
       Contract(Fixnum, Fixnum).should == "Contract Fixnum, Fixnum"
       Contract(Fixnum, Returns[String]).should == "Contract Fixnum => String"
       Contract(Returns[String]).should == "Contract Returns[String]"
+      Contract(Block => Returns[String]).should == "Contract Block => String"
+      Contract(Block[Fixnum] => Returns[String]).should == "Contract Block[Fixnum] => String"
+      Contract(Fixnum, Block[Fixnum] => Returns[String]).should == "Contract Fixnum, Block[Fixnum] => String"
     end
   end
 end
