@@ -178,7 +178,8 @@ module Encase::Contracts
       true
     end
 
-    self.send(:define_method, :method_missing) do |name, *args, &block|
+    # Forward any missing methods to the wrapped type.
+    def method_missing(name, *args, &block)
       @type.send(name, *args, &block)
     end
 
