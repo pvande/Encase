@@ -254,7 +254,7 @@ module Encase::Contracts
     # @param obj [Object] the value to validate
     # @return [Boolean] the result of the validation
     def ===(obj)
-      @types.all? { |t| @contract.send(:validate, [t], [obj]) }
+      @types.all? { |t| @contract.validate([t], [obj]) }
     end
 
     # Is this an optional parameter?
@@ -298,7 +298,7 @@ module Encase::Contracts
     # @param obj [Object] the value to validate
     # @return [Boolean] the result of the validation
     def ===(obj)
-      @types.any? { |t| @contract.send(:validate, [t], [obj]) }
+      @types.any? { |t| @contract.validate([t], [obj]) }
     end
 
     # Is this an optional parameter?
@@ -342,7 +342,7 @@ module Encase::Contracts
     # @param obj [Object] the value to validate
     # @return [Boolean] the result of the validation
     def ===(obj)
-      @types.one? { |t| @contract.send(:validate, [t], [obj]) }
+      @types.one? { |t| @contract.validate([t], [obj]) }
     end
 
     # Is this an optional parameter?

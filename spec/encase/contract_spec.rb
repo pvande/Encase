@@ -12,7 +12,7 @@ describe Encase::Contract do
 
   describe '#validate' do
     def subject(*args)
-      contract.send(:validate, *args)
+      contract.validate(*args)
     end
 
     before do

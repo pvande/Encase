@@ -48,6 +48,57 @@ module Encase
       find_overzealous_splats constraints[:args] if constraints.has_key? :args
     end
 
+    # Handle the actual work of validation.  For the common case, this is as
+    # simple as comparing the elements of the `constraints` list against the
+    # values of the `args` list.  That approach works fine for simple lists,
+    # but we also try to do basic destructuring as well, recursively
+    # validating Arrays and Hashes.
+    # @param consts [Array[#===|Array|Hash]] the set of constraints for
+    #        parameter validation
+    # @param args [Array] the set of values for parameter validation
+    # @return [Boolean] the result of the validation
+    def validate(consts, args)
+      constraints, arguments = consts.dup, args.dup
+
+      while true
+        if arguments.empty?
+          return constraints.all? { |c| c.optional? rescue false } ||
+                 failure(:constraint => consts, :value => args)
+        elsif constraints.empty?
+          return failure(:constraint => consts, :value => args)
+        end
+
+        const, arg = constraints.shift, arguments.shift
+
+        if const.is_a?(Encase::Contracts::Splat)
+          constraints.unshift(const)      if constraints.size < arguments.size
+          arguments.unshift(arg) and next if constraints.size > arguments.size
+        end
+
+        result = if const.is_a? Array
+          validate(const, arg) if arg.is_a?(Array)
+        elsif const.is_a?(Hash) && arg.is_a?(Hash)
+          validate(*const.keys.map { |k| [const[k], arg[k]] }.transpose)
+        else
+          # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
+          (const.is_a?(Proc) ? const[arg] : const === arg)
+        end
+
+        # Speaking of magic, we want to make sure that any code we're
+        # decorating actually checks its types.  To make that happen, we'll
+        # just do a little slight-of-hand on the `args` list here…
+        if const.is_a?(Encase::Contracts::Code)
+          args[args.length - arguments.length - 1] = const.wrap(arg)
+          const.contract.location         = location
+          const.contract.decorated_class  = decorated_class
+          const.contract.decorated_method = 'proc { }'
+        end
+
+        data = { :constraint => const, :value => arg }
+        return false unless (result ? success(data) : failure(data))
+      end
+    end
+
     # @!group Contract Validation Callbacks
 
     # Called after each successful validation.
@@ -88,6 +139,8 @@ module Encase
        return sig
     end
     alias_method :inspect, :to_s
+
+    # @!endgroup
 
     private
 
@@ -163,57 +216,6 @@ module Encase
     undef_method :before, :after
 
     # @!endgroup
-
-    # Handle the actual work of validation.  For the common case, this is as
-    # simple as comparing the elements of the `constraints` list against the
-    # values of the `args` list.  That approach works fine for simple lists,
-    # but we also try to do basic destructuring as well, recursively
-    # validating Arrays and Hashes.
-    # @param consts [Array[#===|Array|Hash]] the set of constraints for
-    #        parameter validation
-    # @param args [Array] the set of values for parameter validation
-    # @return [Boolean] the result of the validation
-    def validate(consts, args)
-      constraints, arguments = consts.dup, args.dup
-
-      while true
-        if arguments.empty?
-          return constraints.all? { |c| c.optional? rescue false } ||
-                 failure(:constraint => consts, :value => args)
-        elsif constraints.empty?
-          return failure(:constraint => consts, :value => args)
-        end
-
-        const, arg = constraints.shift, arguments.shift
-
-        if const.is_a?(Encase::Contracts::Splat)
-          constraints.unshift(const)      if constraints.size < arguments.size
-          arguments.unshift(arg) and next if constraints.size > arguments.size
-        end
-
-        result = if const.is_a? Array
-          validate(const, arg) if arg.is_a?(Array)
-        elsif const.is_a?(Hash) && arg.is_a?(Hash)
-          validate(*const.keys.map { |k| [const[k], arg[k]] }.transpose)
-        else
-          # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
-          (const.is_a?(Proc) ? const[arg] : const === arg)
-        end
-
-        # Speaking of magic, we want to make sure that any code we're
-        # decorating actually checks its types.  To make that happen, we'll
-        # just do a little slight-of-hand on the `args` list here…
-        if const.is_a?(Encase::Contracts::Code)
-          args[args.length - arguments.length - 1] = const.wrap(arg)
-          const.contract.location         = location
-          const.contract.decorated_class  = decorated_class
-          const.contract.decorated_method = 'proc { }'
-        end
-
-        data = { :constraint => const, :value => arg }
-        return false unless (result ? success(data) : failure(data))
-      end
-    end
 
     # Handle discovery of overzealous application of the {Contracts::Returns}
     # type.  The constraint should always be the last element of the contract,
