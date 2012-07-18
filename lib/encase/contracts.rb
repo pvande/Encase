@@ -122,6 +122,23 @@ module Encase::Contracts
         name.sub(/.*::/, '')
       end
     end
+
+    # @implicit
+    module JoinTypeMethods
+
+      # Validate that the argument matches the predicate.
+      # @param obj [Object] the value to validate
+      # @return [Boolean] the result of the validation
+      def ===(obj)
+        @types.send(@predicate) { |t| @contract.validate([t], [obj]) }
+      end
+
+      # Is this an optional parameter?
+      # @return [Bool] returns `true` if all types are optional
+      def optional?
+        @types.send(@predicate) { |t| t.optional? rescue false }
+      end
+    end
   end
 
   # The {Any} type is used to validate only the presence of an argument.
@@ -230,6 +247,7 @@ module Encase::Contracts
   #     end
   class And
     self.send :include, Shared::InstanceMethods
+    self.send :include, Shared::JoinTypeMethods
     self.extend Shared::ClassMethods
 
     # Creates a type constraint as an intersection of the supplied types.
@@ -245,23 +263,11 @@ module Encase::Contracts
     # (see [])
     def initialize(a, b, *rest)
       @args = @types = [a, b, *rest]
+      @predicate = :all?
       class << @contract = Encase::Contract.new
         def success(*); true; end
         def failure(*); false; end
       end
-    end
-
-    # Validate that the argument is either a Proc or a Method.
-    # @param obj [Object] the value to validate
-    # @return [Boolean] the result of the validation
-    def ===(obj)
-      @types.all? { |t| @contract.validate([t], [obj]) }
-    end
-
-    # Is this an optional parameter?
-    # @return [Bool] returns `true` if all types are optional
-    def optional?
-      @types.all? { |t| t.optional? rescue false }
     end
   end
 
@@ -274,6 +280,7 @@ module Encase::Contracts
   #     end
   class Or
     self.send :include, Shared::InstanceMethods
+    self.send :include, Shared::JoinTypeMethods
     self.extend Shared::ClassMethods
 
     # Creates a type constraint as a union of the supplied types.
@@ -289,23 +296,11 @@ module Encase::Contracts
     # (see [])
     def initialize(a, b, *rest)
       @args = @types = [a, b, *rest]
+      @predicate = :any?
       class << @contract = Encase::Contract.new
         def success(*); true; end
         def failure(*); false; end
       end
-    end
-
-    # Validate that the argument is either a Proc or a Method.
-    # @param obj [Object] the value to validate
-    # @return [Boolean] the result of the validation
-    def ===(obj)
-      @types.any? { |t| @contract.validate([t], [obj]) }
-    end
-
-    # Is this an optional parameter?
-    # @return [Bool] returns `true` if any types are optional
-    def optional?
-      @types.any? { |t| t.optional? rescue false }
     end
   end
 
@@ -318,6 +313,7 @@ module Encase::Contracts
   #     end
   class Xor
     self.send :include, Shared::InstanceMethods
+    self.send :include, Shared::JoinTypeMethods
     self.extend Shared::ClassMethods
 
     # Creates a type constraint as an exclusive union of the supplied types.
@@ -333,23 +329,11 @@ module Encase::Contracts
     # (see [])
     def initialize(a, b, *rest)
       @args = @types = [a, b, *rest]
+      @predicate = :one?
       class << @contract = Encase::Contract.new
         def success(*); true; end
         def failure(*); false; end
       end
-    end
-
-    # Validate that the argument is either a Proc or a Method.
-    # @param obj [Object] the value to validate
-    # @return [Boolean] the result of the validation
-    def ===(obj)
-      @types.one? { |t| @contract.validate([t], [obj]) }
-    end
-
-    # Is this an optional parameter?
-    # @return [Bool] returns `true` if any types are optional
-    def optional?
-      @types.any? { |t| t.optional? rescue false }
     end
   end
 
