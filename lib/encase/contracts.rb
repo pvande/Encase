@@ -107,7 +107,7 @@ module Encase::Contracts
       # Generates a readable string representation of the constraint.
       # @return [String] a description of this constraint
       def to_s
-        "#{self.class}[#{@args.map(&:inspect).join(', ')}]"
+        "#{self.class}[#{Encase::Contract.generate_signature(:args => @args)}]"
       end
       alias_method :inspect, :to_s
     end
@@ -134,9 +134,29 @@ module Encase::Contracts
       end
 
       # Is this an optional parameter?
-      # @return [Bool] returns `true` if all types are optional
+      # @return [Bool] returns `true` if the types are optional
       def optional?
         @types.send(@predicate) { |t| t.optional? rescue false }
+      end
+    end
+
+    # @implicit
+    module IsOptional
+
+      # Is this an optional parameter?
+      # @return [Bool] always returns `true`
+      def optional?
+        true
+      end
+    end
+
+    # @implicit
+    module IsNonArgument
+
+      # Is this a non-argument parameter?
+      # @return [Bool] always returns `true`
+      def non_argument?
+        true
       end
     end
   end
@@ -150,9 +170,9 @@ module Encase::Contracts
   class Any
     self.extend Shared::ClassMethods
 
-    # Validate that the argument is either a Proc or a Method.
+    # Always returns `true`.
     # @param obj [Object] the value to validate
-    # @return [Boolean] the result of the validation
+    # @return [Boolean] `true`
     def self.===(obj)
       true
     end
@@ -166,6 +186,7 @@ module Encase::Contracts
   #     end
   class Maybe
     self.send :include, Shared::InstanceMethods
+    self.send :include, Shared::IsOptional
     self.extend Shared::ClassMethods
 
     # Creates an uncertain type constraint of the supplied type.
@@ -187,12 +208,6 @@ module Encase::Contracts
     # @return [Boolean] the result of the validation
     def ===(obj)
       @type === obj || obj.nil?
-    end
-
-    # Is this an optional parameter?
-    # @return [Bool] always returns `true`
-    def optional?
-      true
     end
 
     # Forward any missing methods to the wrapped type.
@@ -222,20 +237,16 @@ module Encase::Contracts
   #       array << 1 << 2 << 3
   #     end
   class None
+    self.extend Shared::IsOptional
     self.extend Shared::ClassMethods
 
-    # Validate that the argument is either a Proc or a Method.
+    # Always returns `false`.
     # @param obj [Object] the value to validate
-    # @return [Boolean] the result of the validation
+    # @return [Boolean] `false`
     def self.===(obj)
       false
     end
 
-    # Is this an optional parameter?
-    # @return [Bool] always returns `true`
-    def self.optional?
-      true
-    end
   end
 
   # The {And} type intersects two or more constraints, validating that the
@@ -602,6 +613,7 @@ module Encase::Contracts
   #     end
   class Splat
     self.send :include, Shared::InstanceMethods
+    self.send :include, Shared::IsOptional
     self.extend Shared::ClassMethods
 
     # Creates a new constraint for describing the type of zero or more
@@ -624,12 +636,6 @@ module Encase::Contracts
     def ===(val)
       @type === val
     end
-
-    # Is this an optional parameter?
-    # @return [Bool] always returns `true`
-    def optional?
-      true
-    end
   end
 
   # The {Block} constraint functions very much like the {Code} constraint, in
@@ -651,12 +657,7 @@ module Encase::Contracts
   #       array.map(&block).join
   #     end
   class Block < Code
-
-    # Is this a non-argument parameter?
-    # @return [Bool] always returns `true`
-    def non_argument?
-      true
-    end
+    self.send :include, Shared::IsNonArgument
   end
 
   # This constraint allows you to write a contract for the return value of the
@@ -699,6 +700,7 @@ module Encase::Contracts
   #
   # This constraint type is only useful as the last argument to `Contract`.
   class Returns < Hash
+    self.send :include, Shared::IsNonArgument
 
     # Creates a new constraint for describing the type of the value returned
     # from the constrained code.
@@ -706,12 +708,6 @@ module Encase::Contracts
     # @return [Returns<type>] a constraint that validates the return value
     def self.[](type)
       super(nil, type)
-    end
-
-    # Is this a non-argument parameter?
-    # @return [Bool] always returns `true`
-    def non_argument?
-      true
     end
 
     # Validate that the return value conforms to the given interface.

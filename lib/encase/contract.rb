@@ -145,7 +145,8 @@ module Encase
         args = []
         args.push *constraints[:args] if has_args
         args.push constraints[:block] if has_block
-        args.join(', ') << "#{has_ret ? ' => ' + retval.value.inspect : ''}"
+        args.map { |x| x.inspect }.join(', ') <<
+        "#{has_ret ? ' => ' + retval.value.inspect : ''}"
       elsif has_ret
         retval.inspect
       else
