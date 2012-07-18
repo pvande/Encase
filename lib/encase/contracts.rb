@@ -743,7 +743,7 @@ module Encase::Contracts
 
     # Returns the wrapped value.  If the wrapped value is itself a {Returns},
     # the inner value is retrieved instead.
-    # @returns [Object] the wrapped value
+    # @return [Object] the wrapped value
     def value
       values[0].is_a?(self.class) ? values[0].value : values[0]
     end

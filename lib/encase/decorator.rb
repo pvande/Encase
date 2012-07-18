@@ -80,6 +80,52 @@ module Encase
       end
     end
 
+    # Creates the appropriate hooks on the given module to observe one -- and
+    # only one -- method definition, and wrap it in the appropriate decorator.
+    # @param klass [Module] the module to establish observers on
+    # @return [void]
+    def watch(klass)
+      deco = self
+      meta = (class << klass; self; end)
+
+      # We create hooks to handle added instance and class methods, caching
+      # the existing methods before we do.
+      hooks = {
+        :method_added => {
+          :into => klass,
+          :orig => klass.method(:method_added),
+        },
+        :singleton_method_added => {
+          :into => meta,
+          :orig => klass.method(:singleton_method_added),
+        },
+      }
+
+      # We have to do a little work to avoid recursion…
+      hooks.each do |hook, opts|
+        already_called = false
+        meta.send(:define_method, hook) do |m|
+          return if already_called || hooks.include?(m)
+          already_called = true
+
+          into = opts[:into]
+
+          # … and to persist debugging information…
+          deco.decorated_class  = into
+          deco.decorated_method = m.to_s
+
+          # … but when a new method is declared, we wrap it with the newly
+          # created decorator instance…
+          method = into.instance_method(m)
+          into.send(:define_method, m, deco.wrap_callable(method))
+
+          # … restore the original hooks, and invoke the original hook.
+          hooks.each { |k,v| meta.send(:define_method, k, v[:orig]) }
+          opts[:orig].call(m)
+        end
+      end
+    end
+
     private
 
     # @!group Decorator Callbacks
@@ -126,52 +172,14 @@ module Encase
       hash[decorator] = Hash.new do |hash, name|
         hash[name] = Module.new do
 
-          # The actual decorator method gathers the arguments (and the block)…
+          # The actual decorator method gathers the arguments (and the block)
+          # and passes them through to the subclass' constructor.  We also
+          # want to persist the location we were called from.
           define_method(name) do |*args, &block|
-
-            # … and passes them through to the subclass' constructor.  We
-            # also want to persist the location we were called from.
             deco = decorator.new(*args, &block)
             deco.location = caller(1)[0]
-
-            self.instance_eval do
-              meta = (class << self; self; end)
-              define = :define_method
-
-              # We create hooks to handle added instance and class methods,
-              # caching the existing methods before we do.
-              hooks = {
-                :method_added           => { :into => self },
-                :singleton_method_added => { :into => meta },
-              }
-              hooks.each { |k,v| v[:orig] = method(k) }
-
-              # We have to do a little work to avoid recursion…
-              hooks.each do |hook, opts|
-                already_called = false
-                meta.send(define, hook) do |m|
-                  return if already_called || hooks.include?(m)
-                  already_called = true
-
-                  # … and to persist debugging information…
-                  deco.decorated_class  = opts[:into]
-                  deco.decorated_method = m.to_s
-
-                  # … but when a new method is declared, we wrap it with the
-                  # newly created decorator instance…
-                  wrapped = deco.wrap_callable(opts[:into].instance_method(m))
-                  opts[:into].send(define, m, wrapped)
-
-                  # … restore the original hooks, and recurse.  Since each
-                  # decorator restores the hook to its previous state, we'll
-                  # terminate after invoking each applicable decorator.
-                  hooks.each { |k,v| meta.send(define, k, v[:orig]) }
-                  send(hook, m)
-                end
-              end
-
-              deco
-            end
+            deco.watch(self)
+            return deco
           end
         end
       end
