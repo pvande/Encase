@@ -198,8 +198,7 @@ module Encase
         keys = const.keys
         validate(const.values_at(*keys), arg.values_at(*keys))
       else
-        # Ruby 1.9 makes Proc#=== magical, but Ruby 1.8.7 doesn't support it
-        (const.is_a?(Proc) ? const[arg] : const === arg)
+        const === arg
       end
     end
 
