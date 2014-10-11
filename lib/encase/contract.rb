@@ -4,7 +4,7 @@ require 'encase/contracts'
 module Encase
   # A Contract is a type of Decorator for describing the expected inputs and
   # outputs of a function or method.  In statically typed languages, these
-  # constraints are typically validated at compile time; i  n the
+  # constraints are typically validated at compile time; in the
   # Decorator-based implementation, we defer most of the validation as late as
   # possible.  This gives us the ability to describe a much richer type
   # system, at the cost of not being able to statically prove our software

@@ -121,6 +121,7 @@ module Encase::Contracts
       def to_s
         name.sub(/.*::/, '')
       end
+      alias_method :inspect, :to_s
     end
 
     # @implicit
