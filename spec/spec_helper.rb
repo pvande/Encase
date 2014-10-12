@@ -8,6 +8,14 @@ unless ENV['CI']
 end
 
 RSpec.configure do |conf|
+  conf.expect_with :rspec do |c|
+    c.syntax = [:should, :expect]
+  end
+
+  conf.mock_with :rspec do |c|
+    c.syntax = [:should, :expect]
+  end
+
   conf.after(:suite) do
     puts "\n"
     SimpleCov.at_exit.call

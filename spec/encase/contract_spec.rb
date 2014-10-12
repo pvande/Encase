@@ -21,49 +21,49 @@ describe Encase::Contract do
     end
 
     it 'should compare a list of contracts to a list of values' do
-      subject([1, 2, 3], [1, 2, 3]).should be_true
-      subject([1, 2, 3], [1, 2]).should be_false
-      subject([1, 2, 3], [1, 2, nil]).should be_false
-      subject([1, 2, 3], [1, 2, 3, 4]).should be_false
-      subject([1, 2, 3], [1, 2, '3']).should be_false
+      subject([1, 2, 3], [1, 2, 3]).should be true
+      subject([1, 2, 3], [1, 2]).should be false
+      subject([1, 2, 3], [1, 2, nil]).should be false
+      subject([1, 2, 3], [1, 2, 3, 4]).should be false
+      subject([1, 2, 3], [1, 2, '3']).should be false
     end
 
     it 'should permit typeclasses as contracts' do
-      subject([Fixnum, String], [1, 'five']).should be_true
-      subject([Fixnum, String], [1, 5]).should be_false
-      subject([Fixnum, String], ['1', 'five']).should be_false
+      subject([Fixnum, String], [1, 'five']).should be true
+      subject([Fixnum, String], [1, 5]).should be false
+      subject([Fixnum, String], ['1', 'five']).should be false
     end
 
     it 'should destructure arrays of contracts as necessary' do
-      subject([[Fixnum], Symbol], [[1], :five]).should be_true
-      subject([[Fixnum], Symbol], [[1, 2], :five]).should be_false
-      subject([[Fixnum], Symbol], [1, :five]).should be_false
-      subject([[Fixnum], Symbol], [['1'], :five]).should be_false
-      subject([[Fixnum], Symbol], [[Fixnum], :five]).should be_false
+      subject([[Fixnum], Symbol], [[1], :five]).should be true
+      subject([[Fixnum], Symbol], [[1, 2], :five]).should be false
+      subject([[Fixnum], Symbol], [1, :five]).should be false
+      subject([[Fixnum], Symbol], [['1'], :five]).should be false
+      subject([[Fixnum], Symbol], [[Fixnum], :five]).should be false
     end
 
     it 'should destructure hashes of contracts as necessary' do
-      subject([{:a => Fixnum}], [{:a => 1}]).should be_true
-      subject([{:a => Fixnum}], [{:a => 1, :b => 2}]).should be_true
-      subject([{:a => Fixnum}], [{:a => Fixnum}]).should be_false
-      subject([{:a => Fixnum}], [{:b => 2}]).should be_false
+      subject([{:a => Fixnum}], [{:a => 1}]).should be true
+      subject([{:a => Fixnum}], [{:a => 1, :b => 2}]).should be true
+      subject([{:a => Fixnum}], [{:a => Fixnum}]).should be false
+      subject([{:a => Fixnum}], [{:b => 2}]).should be false
     end
 
     it 'should use case-style tests for validation' do
       (tester = double()).stub(:===) { |x| !x.nil? }
-      subject([tester], [1]).should be_true
-      subject([tester], [nil]).should be_false
-      subject([1..3], [1]).should be_true
-      subject([1..3], [3]).should be_true
-      subject([1..3], [0]).should be_false
-      subject([1..3], [4]).should be_false
-      subject([/x/], ['x']).should be_true
-      subject([/x/], ['y']).should be_false
+      subject([tester], [1]).should be true
+      subject([tester], [nil]).should be false
+      subject([1..3], [1]).should be true
+      subject([1..3], [3]).should be true
+      subject([1..3], [0]).should be false
+      subject([1..3], [4]).should be false
+      subject([/x/], ['x']).should be true
+      subject([/x/], ['y']).should be false
     end
 
     it 'should permit Procs for validation' do
-      subject([:nil?.to_proc], [nil]).should be_true
-      subject([:nil?.to_proc], [1]).should be_false
+      subject([:nil?.to_proc], [nil]).should be true
+      subject([:nil?.to_proc], [1]).should be false
     end
 
     it 'should invoke the success callback for each successful validation' do
@@ -142,12 +142,12 @@ describe Encase::Contract do
         { :constraint => (1..2), :value => 2   },
         { :constraint => /\d/,   :value => '3' },
       ]
-      
+
       data.each do |x|
         args = hash_including(x)
         contract.should_receive(:success).with(args).and_return(true)
       end
-      
+
       subject [constraint], [{ :b => 2, :a => 1, :c => '3', :d => :d }]
     end
 
@@ -166,12 +166,12 @@ describe Encase::Contract do
         { :constraint => (1..2), :value => :b  },
         { :constraint => /\d/,   :value => nil },
       ]
-      
+
       data.each do |x|
         args = hash_including(x)
         contract.should_receive(:failure).with(args).and_return(true)
       end
-      
+
       subject [constraint], [{ :b => :b, :a => :a, :d => :d }]
     end
   end

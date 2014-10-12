@@ -484,7 +484,7 @@ describe Encase::Contracts::Code do
 
       contract = contract(Code)
       contract.should_receive(:failure).exactly(0).times
-      contract.send(:around, proc { }, [self.method(:example)], nil)
+      contract.send(:around, proc { }, [self.class.method(:example)], nil)
 
       contract = contract(Code, Code)
       contract.should_receive(:failure).exactly(0).times
@@ -508,7 +508,7 @@ describe Encase::Contracts::Code do
 
       contract = contract(Code[])
       contract.should_receive(:failure).exactly(0).times
-      contract.send(:around, proc { }, [self.method(:example)], nil)
+      contract.send(:around, proc { }, [self.class.method(:example)], nil)
 
       contract = contract(Code[], Code[])
       contract.should_receive(:failure).exactly(0).times
